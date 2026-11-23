@@ -58,37 +58,3 @@
 .retry {
   margin-left: 8px;
 }
-
-.events {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.event {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 6px 8px;
-  border-left: 3px solid var(--dsw-alias-brand-primary);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2);
-}
-
-.when {
-  min-width: 52px;
-  color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xs-13);
-  font-variant-numeric: tabular-nums;
-}
-
-.summary {
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font: var(--dsw-font-xs-13);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

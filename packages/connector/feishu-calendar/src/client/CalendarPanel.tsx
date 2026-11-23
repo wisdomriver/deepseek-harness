@@ -1,10 +1,10 @@
-/** The calendar panel: month navigation, state cards, and the month's event list. */
+/** The calendar panel: month navigation, state cards, and the month grid. */
 
 import type { ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { CalendarEvent } from '../types.ts'
 import type { CalendarActions, CalendarViewState } from './controller.ts'
+import { MonthGrid } from './MonthGrid.tsx'
 import css from './CalendarPanel.module.css'
 
 /** Registration-side face the panel's slot entry injects. */
@@ -28,12 +28,11 @@ export type CalendarPanelProps =
  */
 export function CalendarPanel(props: CalendarPanelProps): ReactNode {
   const state = props.useCalendar(snapshot => snapshot)
-  const monthLabel = formatMonth(state.month)
   return (
     <section className={css.panel} aria-label={props.t('title')}>
       <header className={css.header}>
         <h2 className={css.title}>{props.t('title')}</h2>
-        <span className={css.month}>{monthLabel}</span>
+        <span className={css.month}>{formatMonth(state.month)}</span>
         <div className={css.controls}>
           <button type="button" aria-label={props.t('previousMonth')} onClick={props.actions.previousMonth}>‹</button>
           <button type="button" onClick={props.actions.goToToday}>{props.t('today')}</button>
@@ -49,18 +48,9 @@ export function CalendarPanel(props: CalendarPanelProps): ReactNode {
           <button type="button" className={css.retry} onClick={props.actions.refresh}>{props.t('retry')}</button>
         </p>
       ) : null}
-      {state.phase === 'ready' ? (
-        state.events.length === 0
-          ? <p className={css.notice} role="status">{props.t('empty')}</p>
-          : <ol className={css.events} aria-label={props.t('eventCount', { count: state.events.length })}>
-            {state.events.map(event => (
-              <li key={event.eventId} className={css.event}>
-                <span className={css.when}>{event.allDay ? props.t('allDay') : formatTime(event)}</span>
-                <span className={css.summary}>{event.summary === '' ? '—' : event.summary}</span>
-              </li>
-            ))}
-          </ol>
-      ) : null}
+      {state.phase === 'ready'
+        ? <MonthGrid month={state.month} weekStart={state.weekStart} events={state.events} t={props.t} />
+        : null}
     </section>
   )
 }
@@ -84,13 +74,4 @@ function unavailableText(props: CalendarPanelProps, code: string | undefined): s
  */
 function formatMonth(month: string): string {
   return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long' }).format(new Date(`${month}-01T00:00:00`))
-}
-
-/**
- * Format one timed event's local start.
- * @param event - the event, whose `start` is ISO 8601 with an offset.
- * @returns the browser-local clock time.
- */
-function formatTime(event: CalendarEvent): string {
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(event.start))
 }
