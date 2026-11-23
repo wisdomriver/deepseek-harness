@@ -1,0 +1,170 @@
+/**
+ * Exact Fetch routes the panel calls, registered inside Connection's authentication fence.
+ * @module @deepseek-ai/dsh-feishu-calendar/routes
+ */
+
+import { randomUUID } from 'node:crypto'
+import { CalendarError, CALENDAR_HTTP_STATUS, calendarCodeOf } from './errors.ts'
+import { EVENT_PATH, EVENTS_PATH, STATUS_PATH } from './paths.ts'
+import type { CalendarResponse, CreateEventInput } from './types.ts'
+import type { CalendarService } from './service.ts'
+
+/** Methods Connection admits on an exact route. */
+type RouteMethod = 'GET' | 'HEAD' | 'POST'
+
+/** One route in the structural form `ctx.connection.fetch.register` accepts. */
+export interface CalendarRoute {
+  /** Absolute path below `/api`, matched exactly. */
+  readonly path: string
+  /** Methods this route owns. */
+  readonly methods: readonly RouteMethod[]
+  /** How the bridge presents the request body. */
+  readonly requestBody: 'buffered' | 'streaming'
+  /** Handler; only owner principals reach it. */
+  readonly fetch: (request: Request) => Promise<Response>
+}
+
+/** What the route handlers need. */
+export interface CalendarRouteDeps {
+  /** Calendar reads and writes. */
+  readonly service: CalendarService
+  /** Host-side diagnostic sink; it must never receive event content. */
+  readonly log?: (message: string) => void
+}
+
+/**
+ * Build the three calendar routes.
+ * @param deps - service and diagnostic sink.
+ * @returns routes in registration order.
+ */
+export function calendarRoutes(deps: CalendarRouteDeps): readonly CalendarRoute[] {
+  return [
+    {
+      path: STATUS_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: request => answer(deps, request, async () => ({ status: await deps.service.status() })),
+    },
+    {
+      path: EVENTS_PATH,
+      methods: ['GET', 'POST'],
+      requestBody: 'buffered',
+      fetch: request => (request.method === 'POST'
+        ? answer(deps, request, async () => deps.service.create(await readCreateBody(request)))
+        : answer(deps, request, () => {
+          const query = new URL(request.url).searchParams
+          const start = query.get('start') ?? ''
+          const end = query.get('end') ?? ''
+          return deps.service.events(start, end)
+        })),
+    },
+    {
+      path: EVENT_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: request => answer(deps, request, () => deps.service.event(new URL(request.url).searchParams.get('eventId') ?? '')),
+    },
+  ]
+}
+
+/**
+ * Run one handler and shape its answer.
+ * @param deps - service and diagnostic sink.
+ * @param request - authenticated request.
+ * @param handle - the operation, which returns `data` or a `{ status }` wrapper.
+ * @returns a JSON response with the documented status.
+ */
+async function answer(
+  deps: CalendarRouteDeps,
+  request: Request,
+  handle: () => Promise<unknown>,
+): Promise<Response> {
+  const requestId = randomUUID()
+  const startedAt = Date.now()
+  try {
+    const value = await handle()
+    const data = isStatusWrapper(value) ? value.status : value
+    return json({ ok: true, data }, 200)
+  } catch (error: unknown) {
+    const code = calendarCodeOf(error)
+    deps.log?.(`feishu-calendar: ${request.method} ${new URL(request.url).pathname} failed with ${code} after ${Date.now() - startedAt} ms (requestId ${requestId})`)
+    return json({
+      ok: false,
+      error: { code, message: messageFor(code), requestId },
+    }, CALENDAR_HTTP_STATUS[code])
+  }
+}
+
+/**
+ * Read the create request body.
+ * @param request - authenticated request carrying JSON.
+ * @returns the validated input.
+ * @throws CalendarError with `invalid-input` for a malformed body.
+ */
+async function readCreateBody(request: Request): Promise<CreateEventInput> {
+  const raw: unknown = await request.json().catch(() => {
+    throw new CalendarError('invalid-input', 'request body must be JSON')
+  })
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new CalendarError('invalid-input', 'request body must be a JSON object')
+  }
+  const body = raw as Record<string, unknown>
+  const summary = body.summary
+  const allDay = body.allDay
+  const start = body.start
+  const end = body.end
+  const timezone = body.timezone
+  const description = body.description
+  if (typeof summary !== 'string' || summary.trim() === '') {
+    throw new CalendarError('invalid-input', 'summary is required')
+  }
+  if (typeof allDay !== 'boolean') throw new CalendarError('invalid-input', 'allDay must be a boolean')
+  if (typeof start !== 'string' || typeof end !== 'string') {
+    throw new CalendarError('invalid-input', 'start and end are required strings')
+  }
+  if (typeof timezone !== 'string' || timezone.trim() === '') {
+    throw new CalendarError('invalid-input', 'timezone is required')
+  }
+  if (description !== undefined && typeof description !== 'string') {
+    throw new CalendarError('invalid-input', 'description must be a string')
+  }
+  return {
+    summary,
+    allDay,
+    start,
+    end,
+    timezone,
+    ...(typeof description === 'string' ? { description } : {}),
+  }
+}
+
+/**
+ * Test the status handler's wrapper.
+ * @param value - handler return value.
+ * @returns true when the value holds the status payload under `status`.
+ */
+function isStatusWrapper(value: unknown): value is { readonly status: unknown } {
+  return typeof value === 'object' && value !== null && 'status' in value
+}
+
+/**
+ * Answer with one JSON body.
+ * @param body - envelope to serialize.
+ * @param status - HTTP status.
+ * @returns the response with no-store caching.
+ */
+function json<T>(body: CalendarResponse<T>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
+}
+
+/**
+ * Browser-facing copy for one code; the Client localizes it again by code.
+ * @param code - stable failure code.
+ * @returns English text for logs and non-localized clients.
+ */
+function messageFor(code: ReturnType<typeof calendarCodeOf>): string {
+  return `feishu-calendar: ${code}`
+}

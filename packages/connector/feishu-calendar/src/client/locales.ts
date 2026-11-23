@@ -1,0 +1,64 @@
+/** Feishu calendar panel copy, in the two baseline locales. */
+
+/** Simplified Chinese dictionary and key source of truth. */
+export const zh = {
+  panel: '日历',
+  title: '日历',
+  previousMonth: '上个月',
+  nextMonth: '下个月',
+  today: '今天',
+  refresh: '刷新',
+  newEvent: '新建日程',
+  loading: '正在加载日程…',
+  empty: '这个月没有安排',
+  eventCount: '{count} 个日程',
+  allDay: '全天',
+  notConnected: '连接飞书后即可查看日程',
+  notConfigured: '尚未配置飞书应用，连接后即可查看日程',
+  permissionDenied: '飞书应用缺少日历权限',
+  cliMissing: '找不到 lark-cli，请检查飞书插件安装',
+  error: '读取日程失败',
+  retry: '重试',
+  openInFeishu: '在飞书中打开',
+  createTitle: '新建日程',
+  createSummary: '标题',
+  createAllDay: '全天',
+  createStart: '开始',
+  createEnd: '结束',
+  createDescription: '详情',
+  createSubmit: '保存',
+  createCancel: '取消',
+}
+
+/** Locale key union every dictionary must cover. */
+export type CalendarLocaleKey = keyof typeof zh
+
+/** English dictionary, checked against the Chinese key set. */
+export const en: Record<CalendarLocaleKey, string> = {
+  panel: 'Calendar',
+  title: 'Calendar',
+  previousMonth: 'Previous month',
+  nextMonth: 'Next month',
+  today: 'Today',
+  refresh: 'Refresh',
+  newEvent: 'New event',
+  loading: 'Loading events…',
+  empty: 'Nothing scheduled this month',
+  eventCount: '{count} events',
+  allDay: 'All day',
+  notConnected: 'Connect Feishu to see your calendar',
+  notConfigured: 'No Feishu app is configured yet',
+  permissionDenied: 'The Feishu app is missing calendar permissions',
+  cliMissing: 'lark-cli is missing; check the Feishu plugin install',
+  error: 'Could not read the calendar',
+  retry: 'Retry',
+  openInFeishu: 'Open in Feishu',
+  createTitle: 'New event',
+  createSummary: 'Title',
+  createAllDay: 'All day',
+  createStart: 'Start',
+  createEnd: 'End',
+  createDescription: 'Details',
+  createSubmit: 'Save',
+  createCancel: 'Cancel',
+}

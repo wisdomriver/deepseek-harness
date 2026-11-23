@@ -350,6 +350,7 @@
     { "path": "./packages/client/connection/tsconfig.host.json" },
     { "path": "./packages/skill/skill-office" },
     { "path": "./packages/connector/feishu" },
+    { "path": "./packages/connector/feishu-calendar/tsconfig.host.json" },
     { "path": "./packages/skill/tool-workspace-dependencies" },
     { "path": "./packages/connector/wecom" },
     { "path": "./packages/connector/tencent-meeting" },
