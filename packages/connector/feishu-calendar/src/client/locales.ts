@@ -60,6 +60,16 @@ export const zh = {
   endBeforeStart: '结束时间必须晚于开始时间',
   descriptionTooLong: '详情不能超过 5000 字',
   conflictHint: '该时段已有「{summary}」',
+  editTitle: '编辑日程',
+  edit: '编辑',
+  delete: '删除',
+  confirmDelete: '确认删除',
+  scopeLabel: '适用范围',
+  scopeSingle: '仅此次',
+  scopeAll: '全部',
+  scopeFollowing: '此次及后续',
+  deleteFailed: '删除失败，请重试',
+  saveFailed: '保存失败，请重试',
 }
 
 /** Locale key union every dictionary must cover. */
@@ -125,4 +135,14 @@ export const en: Record<CalendarLocaleKey, string> = {
   endBeforeStart: 'The end must be later than the start',
   descriptionTooLong: 'Details are limited to 5000 characters',
   conflictHint: 'This time already holds “{summary}”',
+  editTitle: 'Edit event',
+  edit: 'Edit',
+  delete: 'Delete',
+  confirmDelete: 'Confirm delete',
+  scopeLabel: 'Applies to',
+  scopeSingle: 'This occurrence',
+  scopeAll: 'All events',
+  scopeFollowing: 'This and following',
+  deleteFailed: 'Could not delete the event; try again',
+  saveFailed: 'Could not save the event; try again',
 }

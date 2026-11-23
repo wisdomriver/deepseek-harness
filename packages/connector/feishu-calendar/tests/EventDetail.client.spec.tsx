@@ -29,7 +29,7 @@ const detail: CalendarEventDetail = {
 
 describe('EventDetail', () => {
   it('renders the fields and the Feishu link', () => {
-    render(<EventDetail selection={{ eventId: 'e1', phase: 'ready', detail }} t={t} onClose={() => {}} onRetry={() => {}} />)
+    render(<EventDetail selection={{ eventId: 'e1', phase: 'ready', detail }} t={t} onClose={() => {}} onRetry={() => {}} onEdit={() => {}} onDelete={() => {}} />)
     expect(screen.getByRole('heading', { name: 'Sync' })).toBeTruthy()
     expect(screen.getByText('Asia/Shanghai')).toBeTruthy()
     expect(screen.getByText('Ada')).toBeTruthy()
@@ -46,6 +46,8 @@ describe('EventDetail', () => {
         t={t}
         onClose={() => {}}
         onRetry={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
       />,
     )
     expect(screen.getByRole('button', { name: 'Copy event info' })).toBeTruthy()
@@ -53,15 +55,51 @@ describe('EventDetail', () => {
 
   it('closes on Escape', () => {
     const onClose = vi.fn()
-    render(<EventDetail selection={{ eventId: 'e1', phase: 'loading' }} t={t} onClose={onClose} onRetry={() => {}} />)
+    render(<EventDetail selection={{ eventId: 'e1', phase: 'loading' }} t={t} onClose={onClose} onRetry={() => {}} onEdit={() => {}} onDelete={() => {}} />)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('offers a retry after a failed read', () => {
     const onRetry = vi.fn()
-    render(<EventDetail selection={{ eventId: 'e1', phase: 'error', errorCode: 'not-found' }} t={t} onClose={() => {}} onRetry={onRetry} />)
+    render(<EventDetail selection={{ eventId: 'e1', phase: 'error', errorCode: 'not-found' }} t={t} onClose={() => {}} onRetry={onRetry} onEdit={() => {}} onDelete={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+})
+describe('EventDetail actions', () => {
+  it('edits the loaded detail', () => {
+    const onEdit = vi.fn()
+    render(
+      <EventDetail
+        selection={{ eventId: 'e1', phase: 'ready', detail }}
+        t={t}
+        onClose={() => {}}
+        onRetry={() => {}}
+        onEdit={onEdit}
+        onDelete={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(onEdit).toHaveBeenCalledWith(detail)
+  })
+
+  it('confirms a series delete before calling back', () => {
+    const onDelete = vi.fn()
+    render(
+      <EventDetail
+        selection={{ eventId: 'e1', phase: 'ready', detail: { ...detail, recurringEventId: 'master_0' } }}
+        t={t}
+        onClose={() => {}}
+        onRetry={() => {}}
+        onEdit={() => {}}
+        onDelete={onDelete}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(screen.getByRole('combobox')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
+    expect(onDelete).toHaveBeenCalledWith('all')
   })
 })

@@ -149,3 +149,50 @@ describe('CalendarController create', () => {
     expect(controller.store.getSnapshot().composer?.pending).toBe(false)
   })
 })
+describe('CalendarController edit and delete', () => {
+  it('updates the edited event through the mutation route', async () => {
+    const { calls, fetcher } = routes({
+      status: STATUS,
+      events: { events: [EVENT], fetchedAt: 'now' },
+      event: DETAIL,
+      create: { ok: true, data: { eventId: 'e1' } },
+    })
+    const controller = new CalendarController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.openEvent('e1')
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().selection?.phase).toBe('ready') })
+    controller.actions.openEdit(DETAIL)
+    expect(controller.store.getSnapshot().composer?.mode).toBe('edit')
+    controller.actions.submitCreate({
+      summary: 'Sync v2',
+      allDay: false,
+      start: '2026-11-25T10:00:00+08:00',
+      end: '2026-11-25T10:30:00+08:00',
+      timezone: 'Asia/Shanghai',
+    })
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().composer).toBeUndefined() })
+    const posted = calls.find(call => call.init?.method === 'POST')
+    expect(posted?.route).toBe(EVENT_ROUTE)
+    expect(JSON.parse(String(posted?.init?.body))).toMatchObject({ action: 'update', eventId: 'e1', summary: 'Sync v2' })
+    expect(controller.store.getSnapshot().selection).toBeUndefined()
+  })
+
+  it('deletes the open event and closes the drawer', async () => {
+    const { calls, fetcher } = routes({
+      status: STATUS,
+      events: { events: [EVENT], fetchedAt: 'now' },
+      event: DETAIL,
+      create: { ok: true, data: { eventId: 'e1' } },
+    })
+    const controller = new CalendarController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.openEvent('e1')
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().selection?.phase).toBe('ready') })
+    controller.actions.deleteEvent()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().selection).toBeUndefined() })
+    const posted = calls.find(call => call.init?.method === 'POST')
+    expect(JSON.parse(String(posted?.init?.body))).toMatchObject({ action: 'delete', eventId: 'e1' })
+  })
+})

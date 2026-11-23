@@ -9,6 +9,9 @@ import type {
   CalendarResponse,
   CalendarStatus,
   CreateEventInput,
+  DeleteEventInput,
+  RecurrenceScope,
+  UpdateEventInput,
 } from '../types.ts'
 import { monthKey, monthRange, shiftMonth } from './month.ts'
 
@@ -31,12 +34,28 @@ export interface EventSelection {
 
 /** The create dialog. */
 export interface ComposerState {
+  /** create writes a new event; edit updates the target. */
+  readonly mode: 'create' | 'edit'
+  /** Event being edited; absent in create mode. */
+  readonly target?: CalendarEventDetail
   /** Whether the dialog shows. */
   readonly open: boolean
   /** Day the dialog prefills, when the user started from a cell. */
   readonly prefillDate?: string
   /** True while the create request runs. */
   readonly pending: boolean
+  /** Stable failure code from the last attempt. */
+  readonly errorCode?: string
+}
+
+/** One pending or failed delete. */
+export interface DeleteState {
+  /** Event addressed by the confirmation. */
+  readonly eventId: string
+  /** True while the delete request runs. */
+  readonly pending: boolean
+  /** Scope chosen for a recurring series. */
+  readonly applyTo?: RecurrenceScope
   /** Stable failure code from the last attempt. */
   readonly errorCode?: string
 }
@@ -61,6 +80,8 @@ export interface CalendarViewState {
   composer?: ComposerState
   /** Event the grid highlights after a successful create. */
   highlightEventId?: string
+  /** The pending delete confirmation, if any. */
+  deleting?: DeleteState
 }
 
 /** Panel interactions components call. */
@@ -81,10 +102,14 @@ export interface CalendarActions {
   readonly retryDetail: () => void
   /** Open the create dialog, optionally prefilled with a day. */
   readonly openCreate: (date?: string) => void
+  /** Open the editor for one loaded detail. */
+  readonly openEdit: (detail: CalendarEventDetail) => void
   /** Close the create dialog. */
   readonly closeCreate: () => void
-  /** Submit one event to Feishu. */
-  readonly submitCreate: (input: CreateEventInput) => void
+  /** Submit one event to Feishu, creating or updating according to the dialog mode. */
+  readonly submitCreate: (input: CreateEventInput, applyTo?: RecurrenceScope) => void
+  /** Delete the open event, applying the chosen scope to a recurring series. */
+  readonly deleteEvent: (applyTo?: RecurrenceScope) => void
 }
 
 /** A route answer that reported a stable failure code. */
@@ -143,11 +168,18 @@ export class CalendarController {
         if (selection !== undefined) this.openEvent(selection.eventId)
       },
       openCreate: (date) => { this.openCreate(date) },
+      openEdit: (detail) => {
+        this.store.set({
+          ...this.current(),
+          composer: { open: true, mode: 'edit', target: detail, pending: false },
+        })
+      },
       closeCreate: () => {
         const { composer: _dropped, ...rest } = this.current()
         this.store.set(rest)
       },
-      submitCreate: (input) => { void this.submitCreate(input) },
+      submitCreate: (input, applyTo) => { void this.submitCreate(input, applyTo) },
+      deleteEvent: (applyTo) => { void this.deleteEvent(applyTo) },
     }
   }
 
@@ -243,36 +275,84 @@ export class CalendarController {
   private openCreate(date: string | undefined): void {
     this.store.set({
       ...this.current(),
-      composer: { open: true, pending: false, ...(date === undefined ? {} : { prefillDate: date }) },
+      composer: { open: true, mode: 'create', pending: false, ...(date === undefined ? {} : { prefillDate: date }) },
     })
   }
 
   /**
-   * Create one event and fold the result back into the grid.
+   * Create or update one event and fold the result back into the grid.
    * @param input - validated form values.
+   * @param applyTo - recurring scope for an update; defaults to the whole series.
    */
-  private async submitCreate(input: CreateEventInput): Promise<void> {
+  private async submitCreate(input: CreateEventInput, applyTo?: RecurrenceScope): Promise<void> {
     const composer = this.current().composer
     if (composer === undefined || composer.pending) return
     this.store.set({ ...this.current(), composer: { ...composer, pending: true } })
     try {
-      const data = await this.request<{ eventId: string }>(EVENTS_ROUTE, undefined, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(input),
-      })
-      const { composer: _dropped, ...rest } = this.current()
-      this.store.set({ ...rest, highlightEventId: data.eventId })
+      if (composer.mode === 'edit' && composer.target !== undefined) {
+        const update: UpdateEventInput = {
+          eventId: composer.target.eventId,
+          summary: input.summary,
+          allDay: input.allDay,
+          start: input.start,
+          end: input.end,
+          timezone: input.timezone,
+          ...(input.description === undefined ? {} : { description: input.description }),
+          ...(composer.target.recurringEventId === undefined ? {} : { applyTo: applyTo ?? 'all' }),
+        }
+        await this.request<{ eventId: string }>(EVENT_ROUTE, undefined, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'update', ...update }),
+        })
+        const { composer: _closed, selection: _detail, ...rest } = this.current()
+        this.store.set(rest)
+      } else {
+        const data = await this.request<{ eventId: string }>(EVENTS_ROUTE, undefined, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(input),
+        })
+        const { composer: _closed, ...rest } = this.current()
+        this.store.set({ ...rest, highlightEventId: data.eventId })
+      }
       this.load()
     } catch (error: unknown) {
-      const current = this.current()
       this.store.set({
-        ...current,
-        composer: {
-          open: true,
+        ...this.current(),
+        composer: { ...composer, pending: false, errorCode: codeOf(error) },
+      })
+    }
+  }
+
+  /**
+   * Delete the open event, closing the drawer on success.
+   * @param applyTo - recurring scope; defaults to the whole series.
+   */
+  private async deleteEvent(applyTo: RecurrenceScope | undefined): Promise<void> {
+    const selection = this.current().selection
+    if (selection === undefined) return
+    const scope = applyTo ?? (selection.detail?.recurringEventId === undefined ? undefined : 'all')
+    const deleting: DeleteState = { eventId: selection.eventId, pending: true, ...(scope === undefined ? {} : { applyTo: scope }) }
+    this.store.set({ ...this.current(), deleting })
+    try {
+      const body: DeleteEventInput = { eventId: selection.eventId, ...(scope === undefined ? {} : { applyTo: scope }) }
+      await this.request<{ eventId: string }>(EVENT_ROUTE, undefined, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', ...body }),
+      })
+      const { selection: _closed, deleting: _settled, ...rest } = this.current()
+      this.store.set(rest)
+      this.load()
+    } catch (error: unknown) {
+      this.store.set({
+        ...this.current(),
+        deleting: {
+          eventId: selection.eventId,
           pending: false,
           errorCode: codeOf(error),
-          ...(composer.prefillDate === undefined ? {} : { prefillDate: composer.prefillDate }),
+          ...(scope === undefined ? {} : { applyTo: scope }),
         },
       })
     }

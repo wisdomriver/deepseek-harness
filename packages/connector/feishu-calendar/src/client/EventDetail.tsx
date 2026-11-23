@@ -1,7 +1,8 @@
-/** The event detail drawer: fields, Feishu link, focus lock, and Escape to close. */
+/** The event detail drawer: fields, Feishu link, edit and delete actions, focus lock, Escape to close. */
 
 import { useRef, useState, type ReactNode } from 'react'
-import type { EventSelection } from './controller.ts'
+import type { CalendarEventDetail, RecurrenceScope } from '../types.ts'
+import type { DeleteState, EventSelection } from './controller.ts'
 import { useDialogFocus } from './dialog.ts'
 import { eventWhen, recurrenceLabel, rsvpLabel, statusLabel, type Translate } from './format.ts'
 import css from './EventDetail.module.css'
@@ -16,21 +17,30 @@ export interface EventDetailProps {
   readonly onClose: () => void
   /** Retry a failed detail read. */
   readonly onRetry: () => void
+  /** Open the editor for this detail. */
+  readonly onEdit: (detail: CalendarEventDetail) => void
+  /** Delete the event, applying the chosen scope to a recurring series. */
+  readonly onDelete: (applyTo?: RecurrenceScope) => void
+  /** Pending or failed delete, when one was attempted. */
+  readonly deleting?: DeleteState | undefined
 }
 
 /**
  * Render one event's detail.
- * @param props - selection, localized copy, and close and retry callbacks.
+ * @param props - selection, localized copy, and close, retry, edit, and delete callbacks.
  * @returns the drawer.
  */
-export function EventDetail({ selection, t, onClose, onRetry }: EventDetailProps): ReactNode {
+export function EventDetail({ selection, t, onClose, onRetry, onEdit, onDelete, deleting }: EventDetailProps): ReactNode {
   const panel = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
-
+  const [confirming, setConfirming] = useState(false)
+  const [scope, setScope] = useState<RecurrenceScope>('all')
   useDialogFocus(panel, onClose)
 
   const detail = selection.detail
   const appLink = detail?.appLink ?? selection.appLink
+  const recurring = detail?.recurringEventId !== undefined
+  const busy = deleting?.pending === true
   return (
     <div className={css.backdrop} onClick={onClose}>
       <div
@@ -46,14 +56,12 @@ export function EventDetail({ selection, t, onClose, onRetry }: EventDetailProps
           <button type="button" className={css.close} onClick={onClose} aria-label={t('createCancel')}>×</button>
         </header>
         {selection.phase === 'loading' ? <p className={css.notice} role="status">{t('loading')}</p> : null}
-        {selection.phase === 'error'
-          ? (
-            <p className={css.notice} role="alert">
-              {t('error')}
-              <button type="button" className={css.retry} onClick={onRetry}>{t('retry')}</button>
-            </p>
-          )
-          : null}
+        {selection.phase === 'error' ? (
+          <p className={css.notice} role="alert">
+            {t('error')}
+            <button type="button" className={css.retry} onClick={onRetry}>{t('retry')}</button>
+          </p>
+        ) : null}
         {detail !== undefined && selection.phase === 'ready' ? (
           <>
             <p className={css.when}>
@@ -70,6 +78,17 @@ export function EventDetail({ selection, t, onClose, onRetry }: EventDetailProps
             {detail.description === undefined || detail.description === ''
               ? null
               : <p className={css.description}>{detail.description}</p>}
+            {confirming && recurring ? (
+              <label className={css.scope}>
+                <span className={css.label}>{t('scopeLabel')}</span>
+                <select value={scope} onChange={(event) => { setScope(event.target.value as RecurrenceScope) }}>
+                  <option value="single">{t('scopeSingle')}</option>
+                  <option value="all">{t('scopeAll')}</option>
+                  <option value="this-and-following">{t('scopeFollowing')}</option>
+                </select>
+              </label>
+            ) : null}
+            {deleting?.errorCode === undefined ? null : <p className={css.error} role="alert">{t('deleteFailed')}</p>}
             <footer className={css.footer}>
               {appLink === undefined
                 ? (
@@ -84,6 +103,19 @@ export function EventDetail({ selection, t, onClose, onRetry }: EventDetailProps
                   </button>
                 )
                 : <a className={css.action} href={appLink} target="_blank" rel="noreferrer">{t('openInFeishu')}</a>}
+              <span className={css.spacer} />
+              <button type="button" className={css.action} onClick={() => { onEdit(detail) }}>{t('edit')}</button>
+              <button
+                type="button"
+                className={confirming ? css.danger : css.action}
+                disabled={busy}
+                onClick={() => {
+                  if (!confirming) { setConfirming(true); return }
+                  onDelete(recurring ? scope : undefined)
+                }}
+              >
+                {confirming ? t('confirmDelete') : t('delete')}
+              </button>
             </footer>
           </>
         ) : null}

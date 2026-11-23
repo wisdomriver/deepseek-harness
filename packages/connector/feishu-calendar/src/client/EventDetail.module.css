@@ -125,3 +125,29 @@
 .action:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+.spacer {
+  flex: 1;
+}
+
+.danger {
+  padding: 6px 12px;
+  border: 1px solid var(--dsw-alias-state-error-primary);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-state-error-primary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error {
+  margin: 0;
+  color: var(--dsw-alias-state-error-primary);
+  font: var(--dsw-font-xxs-12);
+}

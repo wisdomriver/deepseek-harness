@@ -35,6 +35,8 @@ export interface CalendarEventDetail extends CalendarEvent {
   readonly recurrence?: string
   /** The signed-in user's response: `accept`, `decline`, `tentative`, or `needs_action`. */
   readonly selfRsvpStatus?: string
+  /** Set on an instance of a recurring series; names the master event. */
+  readonly recurringEventId?: string
 }
 
 /** CLI, account, and authorization facts the panel needs to choose between its states. */
@@ -93,4 +95,35 @@ export interface CalendarEventsData {
   readonly events: readonly CalendarEvent[]
   /** ISO instant the Host read the list. */
   readonly fetchedAt: string
+}
+
+/** Recurring scope one write applies to. */
+export type RecurrenceScope = 'single' | 'all' | 'this-and-following'
+
+/** Body that updates one event. */
+export interface UpdateEventInput {
+  /** Event or instance id. */
+  readonly eventId: string
+  /** Non-empty title, at most 100 characters. */
+  readonly summary: string
+  /** Date-only event when true. */
+  readonly allDay: boolean
+  /** Timed events: ISO 8601 with offset. All-day events: the start date. */
+  readonly start: string
+  /** Timed events: ISO 8601 with offset. All-day events: the inclusive end date. */
+  readonly end: string
+  /** IANA timezone the browser used. */
+  readonly timezone: string
+  /** Markdown description; an empty string clears it. */
+  readonly description?: string
+  /** Recurring scope; required by the CLI on a recurring series. */
+  readonly applyTo?: RecurrenceScope
+}
+
+/** Body that deletes one event. */
+export interface DeleteEventInput {
+  /** Event or instance id. */
+  readonly eventId: string
+  /** Recurring scope; required by the CLI on a recurring series. */
+  readonly applyTo?: RecurrenceScope
 }

@@ -73,3 +73,31 @@ describe('calendar routes', () => {
     expect(logged[0]).toContain('invalid-input')
   })
 })
+describe('calendar event mutations', () => {
+  it('updates through the event route and answers the event id', async () => {
+    const routes = routesOver(() => succeed({}))
+    const event = routes.find(route => route.path === EVENT_PATH)
+    const answer = await event?.fetch(new Request('http://localhost/api/feishu-calendar/event', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'update', eventId: 'e1', summary: 'Sync', allDay: false, start: '2026-11-25T10:00:00+08:00', end: '2026-11-25T10:30:00+08:00', timezone: 'Asia/Shanghai' }),
+    }))
+    expect(answer?.status).toBe(200)
+    await expect(answer?.json()).resolves.toEqual({ ok: true, data: { eventId: 'e1' } })
+  })
+
+  it('deletes through the event route and rejects an unknown action', async () => {
+    const routes = routesOver(() => succeed({}))
+    const event = routes.find(route => route.path === EVENT_PATH)
+    const deleted = await event?.fetch(new Request('http://localhost/api/feishu-calendar/event', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', eventId: 'e1' }),
+    }))
+    expect(deleted?.status).toBe(200)
+    await expect(deleted?.json()).resolves.toEqual({ ok: true, data: { eventId: 'e1' } })
+    const bad = await event?.fetch(new Request('http://localhost/api/feishu-calendar/event', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'rename', eventId: 'e1' }),
+    }))
+    expect(bad?.status).toBe(400)
+  })
+})

@@ -29,7 +29,7 @@ function event(overrides: Partial<CalendarEvent> & Pick<CalendarEvent, 'eventId'
 describe('CreateDialog', () => {
   it('requires a title', () => {
     const onSubmit = vi.fn()
-    render(<CreateDialog composer={{ open: true, pending: false }} t={t} events={[]} onCancel={() => {}} onSubmit={onSubmit} />)
+    render(<CreateDialog composer={{ open: true, mode: 'create', pending: false }} t={t} events={[]} onCancel={() => {}} onSubmit={onSubmit} />)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('A title is required')).toBeTruthy()
     expect(onSubmit).not.toHaveBeenCalled()
@@ -37,7 +37,7 @@ describe('CreateDialog', () => {
 
   it('submits a timed event with the browser timezone', () => {
     const onSubmit = vi.fn()
-    render(<CreateDialog composer={{ open: true, pending: false }} t={t} events={[]} onCancel={() => {}} onSubmit={onSubmit} />)
+    render(<CreateDialog composer={{ open: true, mode: 'create', pending: false }} t={t} events={[]} onCancel={() => {}} onSubmit={onSubmit} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Standup' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
@@ -53,7 +53,7 @@ describe('CreateDialog', () => {
     const blocking = event({ eventId: 'x', summary: 'Trip', allDay: true, start: today, end: today })
     render(
       <CreateDialog
-        composer={{ open: true, prefillDate: today, pending: false }}
+        composer={{ open: true, mode: 'create', prefillDate: today, pending: false }}
         t={t}
         events={[blocking]}
         onCancel={() => {}}
@@ -71,7 +71,7 @@ describe('CreateDialog', () => {
   })
 
   it('disables the actions while the create runs', () => {
-    render(<CreateDialog composer={{ open: true, pending: true }} t={t} events={[]} onCancel={() => {}} onSubmit={() => {}} />)
+    render(<CreateDialog composer={{ open: true, mode: 'create', pending: true }} t={t} events={[]} onCancel={() => {}} onSubmit={() => {}} />)
     expect(screen.getByRole('button', { name: 'Saving…' })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveProperty('disabled', true)
   })

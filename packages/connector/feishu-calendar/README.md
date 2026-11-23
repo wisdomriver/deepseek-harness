@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Install the bundle into a profile, then open Calendar in the sidebar. The panel shows the primary calendar as a month grid: each day lists up to three events and folds the rest behind a count. The arrows move between months, Today returns to the current one, Refresh re-reads the shown month, and New event opens a four-field form. Pressing an event chip or an agenda row opens its detail drawer. Without a configured Feishu app or a signed-in user the panel explains the state instead of failing, and it says so when `lark-cli` is missing.
+Install the bundle into a profile, then open Calendar in the sidebar. The panel shows the primary calendar as a month grid: each day lists up to three events and folds the rest behind a count. The arrows move between months, Today returns to the current one, Refresh re-reads the shown month, and New event opens a four-field form. Pressing an event chip or an agenda row opens its detail drawer, whose Edit and Delete actions update or remove the event; a recurring series asks for the scope first. Without a configured Feishu app or a signed-in user the panel explains the state instead of failing, and it says so when `lark-cli` is missing.
 
 The month comes from one `calendar +agenda` call covering the grid's 42 cells, so a whole view costs one CLI process; repeated reads within 60 seconds come from memory. Details follow the event id through `calendar +get`, and a recurring instance costs one extra read of its master for the recurrence rule. A created event is written with `calendar events create --data -` over standard input, which keeps the title out of the process command line and creates no meeting or reminders.
 
@@ -75,7 +75,7 @@ This plugin contributes no model-visible input: it adds no tool, prompt section,
 <a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
-- Week and day views, editing, deleting, RSVP, attendees, location display, and meeting links are deferred.
+- Week and day views, RSVP, attendees, location display, and meeting links are deferred.
 - Only the primary calendar is read, and only date and timed events with a title, bounds, and a description can be created.
 - The create form detects overlapping events from the loaded month and only warns; Feishu remains the authority.
 - The client reads the routes on panel load rather than when the panel first becomes visible, and status polling while visible is not implemented yet.

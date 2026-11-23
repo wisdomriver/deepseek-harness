@@ -69,7 +69,17 @@ export function CalendarPanel(props: CalendarPanelProps): ReactNode {
       ) : null}
       {state.selection === undefined
         ? null
-        : <EventDetail selection={state.selection} t={props.t} onClose={actions.closeEvent} onRetry={actions.retryDetail} />}
+        : (
+          <EventDetail
+            selection={state.selection}
+            t={props.t}
+            onClose={actions.closeEvent}
+            onRetry={actions.retryDetail}
+            onEdit={actions.openEdit}
+            onDelete={actions.deleteEvent}
+            deleting={state.deleting}
+          />
+        )}
       {state.composer === undefined
         ? null
         : (

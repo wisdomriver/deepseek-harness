@@ -206,3 +206,55 @@ describe('CalendarService.create', () => {
     })).rejects.toMatchObject({ code: 'unknown-outcome' })
   })
 })
+describe('CalendarService.updateEvent', () => {
+  it('patches an all-day event with dates, keeping it all-day', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.updateEvent({
+      eventId: 'e1', summary: 'Trip v2', allDay: true,
+      start: '2026-12-19', end: '2026-12-20', timezone: 'Asia/Shanghai', description: 'note',
+    })).resolves.toEqual({ eventId: 'e1' })
+    expect(calls[0]?.args.slice(0, 7)).toEqual(['calendar', 'events', 'patch', '--calendar-id', 'primary', '--event-id', 'e1'])
+    const body = JSON.parse(calls[0]?.stdin ?? '{}')
+    expect(body).toEqual({
+      summary: 'Trip v2',
+      description: 'note',
+      start_time: { date: '2026-12-19', timezone: 'Asia/Shanghai' },
+      end_time: { date: '2026-12-20', timezone: 'Asia/Shanghai' },
+    })
+  })
+
+  it('updates a timed event through the shortcut with the series scope', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await service.updateEvent({
+      eventId: 'e1', summary: 'Standup', allDay: false,
+      start: '2026-11-25T10:00:00+08:00', end: '2026-11-25T10:30:00+08:00',
+      timezone: 'Asia/Shanghai', applyTo: 'single',
+    })
+    expect(calls[0]?.args).toContain('+update')
+    expect(calls[0]?.args).toContain('--apply-to')
+    expect(calls[0]?.args[calls[0].args.length - 1]).toBe('single')
+  })
+
+  it('refuses a partial all-day series edit before running anything', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.updateEvent({
+      eventId: 'e1', summary: 'Trip', allDay: true,
+      start: '2026-12-19', end: '2026-12-19', timezone: 'Asia/Shanghai', applyTo: 'single',
+    })).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+})
+
+describe('CalendarService.deleteEvent', () => {
+  it('deletes with the confirmed flag and no scope for a single event', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.deleteEvent({ eventId: 'e1' })).resolves.toEqual({ eventId: 'e1' })
+    expect(calls[0]?.args).toEqual(['calendar', '+delete', '--event-id', 'e1', '--yes'])
+  })
+
+  it('passes the recurring scope through', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await service.deleteEvent({ eventId: 'e1', applyTo: 'all' })
+    expect(calls[0]?.args.slice(-2)).toEqual(['--apply-to', 'all'])
+  })
+})

@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { CalendarError, CALENDAR_HTTP_STATUS, calendarCodeOf } from './errors.ts'
 import { EVENT_PATH, EVENTS_PATH, STATUS_PATH } from './paths.ts'
-import type { CalendarResponse, CreateEventInput } from './types.ts'
+import type { CalendarResponse, CreateEventInput, DeleteEventInput, RecurrenceScope, UpdateEventInput } from './types.ts'
 import type { CalendarService } from './service.ts'
 
 /** Methods Connection admits on an exact route. */
@@ -60,9 +60,16 @@ export function calendarRoutes(deps: CalendarRouteDeps): readonly CalendarRoute[
     },
     {
       path: EVENT_PATH,
-      methods: ['GET'],
+      methods: ['GET', 'POST'],
       requestBody: 'buffered',
-      fetch: request => answer(deps, request, () => deps.service.event(new URL(request.url).searchParams.get('eventId') ?? '')),
+      fetch: request => (request.method === 'POST'
+        ? answer(deps, request, async () => {
+          const mutation = await readMutationBody(request)
+          return mutation.action === 'delete'
+            ? deps.service.deleteEvent(mutation.input)
+            : deps.service.updateEvent(mutation.input)
+        })
+        : answer(deps, request, () => deps.service.event(new URL(request.url).searchParams.get('eventId') ?? ''))),
     },
   ]
 }
@@ -156,4 +163,70 @@ function json<T>(body: CalendarResponse<T>, status: number): Response {
  */
 function messageFor(code: ReturnType<typeof calendarCodeOf>): string {
   return `feishu-calendar: ${code}`
+}
+
+/** One event mutation the panel posts. */
+type EventMutation =
+  | { readonly action: 'update'; readonly input: UpdateEventInput }
+  | { readonly action: 'delete'; readonly input: DeleteEventInput }
+
+/**
+ * Read one event mutation body.
+ * @param request - authenticated request carrying JSON.
+ * @returns the mutation to run.
+ * @throws CalendarError with `invalid-input` for a malformed body.
+ */
+async function readMutationBody(request: Request): Promise<EventMutation> {
+  const raw: unknown = await request.json().catch(() => {
+    throw new CalendarError('invalid-input', 'request body must be JSON')
+  })
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new CalendarError('invalid-input', 'request body must be a JSON object')
+  }
+  const body = raw as Record<string, unknown>
+  const eventId = typeof body.eventId === 'string' ? body.eventId.trim() : ''
+  if (eventId === '') throw new CalendarError('invalid-input', 'eventId is required')
+  const applyTo = scopeOf(body.applyTo)
+  if (body.action === 'delete') {
+    return { action: 'delete', input: { eventId, ...(applyTo === undefined ? {} : { applyTo }) } }
+  }
+  if (body.action !== 'update') throw new CalendarError('invalid-input', 'action must be update or delete')
+  if (typeof body.summary !== 'string' || body.summary.trim() === '') {
+    throw new CalendarError('invalid-input', 'summary is required')
+  }
+  if (typeof body.allDay !== 'boolean') throw new CalendarError('invalid-input', 'allDay must be a boolean')
+  if (typeof body.start !== 'string' || typeof body.end !== 'string') {
+    throw new CalendarError('invalid-input', 'start and end are required strings')
+  }
+  if (typeof body.timezone !== 'string' || body.timezone.trim() === '') {
+    throw new CalendarError('invalid-input', 'timezone is required')
+  }
+  if (body.description !== undefined && typeof body.description !== 'string') {
+    throw new CalendarError('invalid-input', 'description must be a string')
+  }
+  return {
+    action: 'update',
+    input: {
+      eventId,
+      summary: body.summary,
+      allDay: body.allDay,
+      start: body.start,
+      end: body.end,
+      timezone: body.timezone,
+      ...(typeof body.description === 'string' ? { description: body.description } : {}),
+      ...(applyTo === undefined ? {} : { applyTo }),
+    },
+  }
+}
+
+/**
+ * Validate one recurring scope from the wire.
+ * @param value - scope the browser sent.
+ * @returns the scope, or undefined when absent.
+ * @throws CalendarError with `invalid-input` for an unknown scope.
+ */
+function scopeOf(value: unknown): RecurrenceScope | undefined {
+  if (value === undefined) return undefined
+  if (value === 'single' || value === 'all' || value === 'this-and-following') return value
+  throw new CalendarError('invalid-input', 'applyTo must be single, all, or this-and-following')
 }

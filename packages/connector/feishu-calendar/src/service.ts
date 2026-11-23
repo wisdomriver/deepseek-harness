@@ -13,6 +13,9 @@ import type {
   CalendarEventsData,
   CalendarStatus,
   CreateEventInput,
+  DeleteEventInput,
+  RecurrenceScope,
+  UpdateEventInput,
 } from './types.ts'
 
 /** Scopes the panel needs; a token lacking any of them cannot answer its own reads. */
@@ -177,6 +180,69 @@ export class CalendarService {
     if (eventId === undefined || eventId === '') {
       throw new CalendarError('unknown-outcome', `${PROGRAM} accepted the create request without an event id`)
     }
+    this.invalidate()
+    return { eventId }
+  }
+
+  /**
+   * Update one event. All-day events go through the raw patch API because the
+   * `+update` shortcut turns date bounds into a timed event.
+   * @param input - event id, title, bounds, optional description, and recurring scope.
+   * @returns the updated event id.
+   * @throws CalendarError with `invalid-input` before any process starts, or the mapped CLI failure.
+   */
+  async updateEvent(input: UpdateEventInput): Promise<{ eventId: string }> {
+    const eventId = trimRequired(input.eventId, 'eventId')
+    const summary = trimRequired(input.summary, 'summary')
+    if (summary.length > 100) throw new CalendarError('invalid-input', 'summary must be at most 100 characters')
+    if (input.description !== undefined && input.description.length > 5000) {
+      throw new CalendarError('invalid-input', 'description must be at most 5000 characters')
+    }
+    const timezone = trimRequired(input.timezone, 'timezone')
+    const scope = recurrenceScopeOf(input.applyTo)
+    if (input.allDay) {
+      const start = requireDate(input.start, 'start')
+      const end = requireDate(input.end, 'end')
+      if (end < start) throw new CalendarError('invalid-input', 'end must not be earlier than start')
+      if (scope !== undefined && scope !== 'all') {
+        throw new CalendarError('invalid-input', 'all-day events support whole-series edits only')
+      }
+      const body: Record<string, unknown> = {
+        summary,
+        start_time: { date: start, timezone },
+        end_time: { date: end, timezone },
+      }
+      if (input.description !== undefined) body.description = input.description
+      const args = ['calendar', 'events', 'patch', '--calendar-id', 'primary', '--event-id', eventId, '--data', '-']
+      const envelope = this.envelope(await this.command(args, this.options.writeTimeoutMs, JSON.stringify(body)), args)
+      if (envelope.ok !== true) throw envelopeFailure(envelope)
+    } else {
+      const start = requireInstant(input.start, 'start')
+      const end = requireInstant(input.end, 'end')
+      if (Date.parse(end) <= Date.parse(start)) throw new CalendarError('invalid-input', 'end must be later than start')
+      const args = ['calendar', '+update', '--event-id', eventId, '--summary', summary, '--start', start, '--end', end]
+      if (input.description !== undefined) args.push('--description', input.description)
+      if (scope !== undefined) args.push('--apply-to', scope)
+      const envelope = this.envelope(await this.command(args, this.options.writeTimeoutMs), args)
+      if (envelope.ok !== true) throw envelopeFailure(envelope)
+    }
+    this.invalidate()
+    return { eventId }
+  }
+
+  /**
+   * Delete one event.
+   * @param input - event id and the recurring scope the CLI requires for a series.
+   * @returns the deleted event id.
+   * @throws CalendarError with `invalid-input` for a bad scope, or the mapped CLI failure.
+   */
+  async deleteEvent(input: DeleteEventInput): Promise<{ eventId: string }> {
+    const eventId = trimRequired(input.eventId, 'eventId')
+    const scope = recurrenceScopeOf(input.applyTo)
+    const args = ['calendar', '+delete', '--event-id', eventId, '--yes']
+    if (scope !== undefined) args.push('--apply-to', scope)
+    const envelope = this.envelope(await this.command(args, this.options.writeTimeoutMs), args)
+    if (envelope.ok !== true) throw envelopeFailure(envelope)
     this.invalidate()
     return { eventId }
   }
@@ -439,6 +505,7 @@ function toDetail(raw: Record<string, unknown>, recurrence: string | undefined):
     ...optional('description', asString(raw.description)),
     ...optional('recurrence', recurrence),
     ...optional('selfRsvpStatus', asString(raw.self_rsvp_status)),
+    ...optional('recurringEventId', asString(raw.recurring_event_id)),
   }
 }
 
@@ -474,4 +541,44 @@ function trimRequired(value: string, field: string): string {
   const trimmed = value.trim()
   if (trimmed === '') throw new CalendarError('invalid-input', `${field} must not be empty`)
   return trimmed
+}
+
+/**
+ * Validate one recurring scope from the wire.
+ * @param value - scope the browser sent.
+ * @returns the scope, or undefined when absent.
+ * @throws CalendarError with `invalid-input` for an unknown scope.
+ */
+function recurrenceScopeOf(value: RecurrenceScope | undefined): RecurrenceScope | undefined {
+  if (value === undefined) return undefined
+  if (value === 'single' || value === 'all' || value === 'this-and-following') return value
+  throw new CalendarError('invalid-input', 'applyTo must be single, all, or this-and-following')
+}
+
+/**
+ * Require one `YYYY-MM-DD` bound.
+ * @param value - bound from the wire.
+ * @param field - field name, for the diagnostic.
+ * @returns the date.
+ * @throws CalendarError with `invalid-input` when the value is not a day.
+ */
+function requireDate(value: string, field: string): string {
+  if (!DATE_ONLY.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new CalendarError('invalid-input', `${field} must be YYYY-MM-DD for an all-day event`)
+  }
+  return value
+}
+
+/**
+ * Require one ISO 8601 instant bound.
+ * @param value - bound from the wire.
+ * @param field - field name, for the diagnostic.
+ * @returns the instant.
+ * @throws CalendarError with `invalid-input` when the value is not an instant.
+ */
+function requireInstant(value: string, field: string): string {
+  if (Number.isNaN(Date.parse(value)) || !/\d{4}-\d{2}-\d{2}T/.test(value)) {
+    throw new CalendarError('invalid-input', `${field} must be an ISO 8601 instant`)
+  }
+  return value
 }
