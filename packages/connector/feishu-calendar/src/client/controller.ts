@@ -65,7 +65,7 @@ export class CalendarController {
   /**
    * @param fetcher - same-origin fetch used for the relative routes.
    */
-  constructor(fetcher: typeof fetch = fetch) {
+  constructor(fetcher: typeof fetch = (input, init) => fetch(input, init)) {
     this.fetcher = fetcher
     this.store = createSnapshotStore<CalendarViewState>({
       phase: 'loading',
