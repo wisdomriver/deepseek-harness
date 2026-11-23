@@ -2,9 +2,13 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { CalendarEvent } from '../types.ts'
+import { calendarAccent } from './color.ts'
 import type { CalendarLocaleKey } from './locales.ts'
 import { eventsByDay, gridCells, type GridCell } from './month.ts'
 import css from './MonthGrid.module.css'
+
+/** Accent classes by {@link calendarAccent} result; index 0 is unused. */
+const ACCENT_CLASSES = [css.accent1, css.accent2, css.accent3, css.accent4, css.accent5, css.accent6, css.accent7, css.accent8]
 
 /** Chips one cell shows before it offers its fold control. */
 const CHIPS_PER_CELL = 3
@@ -115,7 +119,7 @@ export function MonthGrid({ month, weekStart, events, t, onOpenEvent, onCreate, 
                       <li key={event.eventId}>
                         <button
                           type="button"
-                          className={event.eventId === highlightEventId ? `${css.chip} ${css.chipHighlight}` : css.chip}
+                          className={chipClass(event, highlightEventId)}
                           title={event.summary}
                           onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpenEvent(event.eventId) }}
                         >
@@ -200,4 +204,15 @@ function ariaLabel(
  */
 function formatTime(start: string): string {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(start))
+}
+
+/**
+ * Class list for one event chip: its calendar accent and the create highlight.
+ * @param event - the event.
+ * @param highlightEventId - event created by the last successful submit.
+ * @returns the chip's class names.
+ */
+function chipClass(event: CalendarEvent, highlightEventId: string | undefined): string {
+  const accent = ACCENT_CLASSES[calendarAccent(event.colorIndex) - 1]
+  return [css.chip, accent, event.eventId === highlightEventId ? css.chipHighlight : ''].filter(Boolean).join(' ')
 }

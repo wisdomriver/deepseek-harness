@@ -75,7 +75,7 @@
   gap: 4px;
   overflow: hidden;
   padding: 1px 4px;
-  border-left: 2px solid var(--dsw-alias-brand-primary);
+  border-left: 2px solid var(--event-accent, var(--dsw-alias-brand-primary));
   border-radius: 2px;
   background: var(--dsw-alias-bg-layer-2);
 }
@@ -110,4 +110,36 @@
 
 .chipHighlight {
   outline: 2px solid var(--dsw-alias-brand-primary);
+}
+
+.accent1 {
+  --event-accent: var(--dsw-alias-calendar-1);
+}
+
+.accent2 {
+  --event-accent: var(--dsw-alias-calendar-2);
+}
+
+.accent3 {
+  --event-accent: var(--dsw-alias-calendar-3);
+}
+
+.accent4 {
+  --event-accent: var(--dsw-alias-calendar-4);
+}
+
+.accent5 {
+  --event-accent: var(--dsw-alias-calendar-5);
+}
+
+.accent6 {
+  --event-accent: var(--dsw-alias-calendar-6);
+}
+
+.accent7 {
+  --event-accent: var(--dsw-alias-calendar-7);
+}
+
+.accent8 {
+  --event-accent: var(--dsw-alias-calendar-8);
 }

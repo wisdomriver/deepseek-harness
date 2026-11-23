@@ -23,6 +23,8 @@ export interface CalendarEvent {
   readonly isException: boolean
   /** Link that opens the event in Feishu, when the CLI returned one. */
   readonly appLink?: string
+  /** Feishu's signed ARGB color integer, when the event carries one; -1 is the default. */
+  readonly colorIndex?: number
 }
 
 /** One event's full detail, read when the drawer opens. */

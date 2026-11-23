@@ -217,7 +217,15 @@ body {
   --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
   --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
   --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
-  --dsw-alias-card-fill: var(--dsw-static-neutral-50);
+  /* Feishu calendar event accents: eight hues the calendar panel maps an event color onto. */
+  --dsw-alias-calendar-1: var(--dsw-static-blue-500);
+  --dsw-alias-calendar-2: rgb(0, 194, 168);
+  --dsw-alias-calendar-3: var(--dsw-static-green-500);
+  --dsw-alias-calendar-4: var(--dsw-static-amber-500);
+  --dsw-alias-calendar-5: var(--dsw-static-red-400);
+  --dsw-alias-calendar-6: var(--dsw-static-violet-600);
+  --dsw-alias-calendar-7: rgb(255, 119, 185);
+  --dsw-alias-calendar-8: var(--dsw-static-neutral-500);  --dsw-alias-card-fill: var(--dsw-static-neutral-50);
   --dsw-alias-card-fill-hover: var(--dsw-static-neutral-100);
   --dsw-alias-card-tile-fill: color-mix(in srgb, var(--dsw-static-neutral-00) 50%, transparent);
   --dsw-alias-chart-messages: var(--dsw-static-blue-450);
@@ -369,7 +377,15 @@ body[data-ds-dark-theme] {
   --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
   --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
   --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
-  --dsw-alias-card-fill: var(--dsw-static-neutral-850);
+  /* Brighter calendar accents for dark surfaces, same hue order as the light theme. */
+  --dsw-alias-calendar-1: var(--dsw-static-blue-400);
+  --dsw-alias-calendar-2: rgb(0, 214, 185);
+  --dsw-alias-calendar-3: var(--dsw-static-green-400);
+  --dsw-alias-calendar-4: var(--dsw-static-amber-400);
+  --dsw-alias-calendar-5: var(--dsw-static-red-400);
+  --dsw-alias-calendar-6: var(--dsw-static-violet-400);
+  --dsw-alias-calendar-7: rgb(255, 146, 200);
+  --dsw-alias-calendar-8: var(--dsw-static-neutral-500);  --dsw-alias-card-fill: var(--dsw-static-neutral-850);
   --dsw-alias-card-fill-hover: var(--dsw-static-neutral-800);
   --dsw-alias-card-tile-fill: color-mix(in srgb, var(--dsw-static-neutral-00) 5%, transparent);
   --dsw-alias-chart-messages: var(--dsw-static-blue-450);

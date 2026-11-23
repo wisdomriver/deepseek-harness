@@ -486,6 +486,7 @@ function toEvent(raw: Record<string, unknown>): CalendarEvent {
     status: asString(raw.status) ?? 'confirmed',
     isException: raw.is_exception === true,
     ...optional('appLink', asString(raw.app_link)),
+    ...(typeof raw.color === 'number' ? { colorIndex: raw.color } : {}),
   }
 }
 

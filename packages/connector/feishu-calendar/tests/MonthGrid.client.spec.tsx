@@ -79,3 +79,22 @@ describe('MonthGrid', () => {
     expect(screen.getByRole('button', { name: /Standup/ })).toBeTruthy()
   })
 })
+describe('MonthGrid accents', () => {
+  it('paints a colored chip differently from a default one', () => {
+    render(
+      <MonthGrid
+        month="2026-11"
+        weekStart="monday"
+        events={[
+          event({ eventId: 'plain', summary: 'Plain', allDay: true, start: '2026-11-10', end: '2026-11-10' }),
+          event({ eventId: 'colored', summary: 'Colored', allDay: true, start: '2026-11-10', end: '2026-11-10', colorIndex: (0xFF3F80FF | 0) }),
+        ]}
+        t={t}
+        onOpenEvent={() => {}}
+      />,
+    )
+    const plain = screen.getByRole('button', { name: /Plain/ }).className
+    const colored = screen.getByRole('button', { name: /Colored/ }).className
+    expect(colored).not.toBe(plain)
+  })
+})
