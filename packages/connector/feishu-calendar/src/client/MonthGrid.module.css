@@ -67,6 +67,10 @@
 
 .chip {
   display: flex;
+  width: 100%;
+  text-align: left;
+  border: none;
+  cursor: pointer;
   align-items: baseline;
   gap: 4px;
   overflow: hidden;
@@ -102,4 +106,8 @@
   color: var(--dsw-alias-link);
   font: var(--dsw-font-xxs-12);
   cursor: pointer;
+}
+
+.chipHighlight {
+  outline: 2px solid var(--dsw-alias-brand-primary);
 }

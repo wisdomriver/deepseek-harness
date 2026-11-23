@@ -22,8 +22,12 @@ export interface MonthGridProps {
   readonly events: readonly CalendarEvent[]
   /** Localized copy. */
   readonly t: (key: CalendarLocaleKey, params?: Record<string, unknown>) => string
+  /** Opens one event's detail. */
+  readonly onOpenEvent: (eventId: string) => void
   /** Opens the create dialog for one day; absent until the dialog exists. */
   readonly onCreate?: (date: string) => void
+  /** Event to highlight after a successful create. */
+  readonly highlightEventId?: string | undefined
 }
 
 /**
@@ -31,7 +35,7 @@ export interface MonthGridProps {
  * @param props - month, week start, events, and localized copy.
  * @returns the grid.
  */
-export function MonthGrid({ month, weekStart, events, t, onCreate }: MonthGridProps): ReactNode {
+export function MonthGrid({ month, weekStart, events, t, onOpenEvent, onCreate, highlightEventId }: MonthGridProps): ReactNode {
   const cells = useMemo(() => gridCells(month, weekStart), [month, weekStart])
   const byDay = useMemo(() => eventsByDay(events, cells), [events, cells])
   const weekdays = useMemo(() => weekdayLabels(weekStart), [weekStart])
@@ -108,11 +112,18 @@ export function MonthGrid({ month, weekStart, events, t, onCreate }: MonthGridPr
                   <span className={css.dayNumber}>{Number(cell.date.slice(8, 10))}</span>
                   <ul className={css.chips} onClick={(event) => { event.stopPropagation() }}>
                     {shown.map(event => (
-                      <li key={event.eventId} className={css.chip} title={event.summary}>
-                        {event.allDay
-                          ? <span className={css.allDay}>{t('allDay')}</span>
-                          : <span className={css.time}>{formatTime(event.start)}</span>}
-                        <span className={css.chipTitle}>{event.summary === '' ? '—' : event.summary}</span>
+                      <li key={event.eventId}>
+                        <button
+                          type="button"
+                          className={event.eventId === highlightEventId ? `${css.chip} ${css.chipHighlight}` : css.chip}
+                          title={event.summary}
+                          onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpenEvent(event.eventId) }}
+                        >
+                          {event.allDay
+                            ? <span className={css.allDay}>{t('allDay')}</span>
+                            : <span className={css.time}>{formatTime(event.start)}</span>}
+                          <span className={css.chipTitle}>{event.summary === '' ? '—' : event.summary}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>

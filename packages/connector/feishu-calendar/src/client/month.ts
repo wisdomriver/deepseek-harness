@@ -104,6 +104,16 @@ export function eventsByDay(events: readonly CalendarEvent[], cells: readonly Gr
 }
 
 /**
+ * Test whether an event occupies one calendar day.
+ * @param event - one event.
+ * @param day - calendar date in `YYYY-MM-DD`.
+ * @returns true when the event covers that day.
+ */
+export function coversDay(event: CalendarEvent, day: string): boolean {
+  return coveredDates(event).includes(day)
+}
+
+/**
  * The calendar days one event occupies, ending day included.
  * @param event - one event.
  * @returns its dates in `YYYY-MM-DD`, one day when it is a single-day event.

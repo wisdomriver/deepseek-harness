@@ -1,12 +1,45 @@
-/** Panel data plumbing: one route read per month, held in a snapshot store the components subscribe to. */
+/** Panel data plumbing: month reads, event details, creates, and the snapshot store components read. */
 
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { EVENTS_ROUTE, STATUS_ROUTE } from '../paths.ts'
-import type { CalendarEvent, CalendarEventsData, CalendarResponse, CalendarStatus } from '../types.ts'
+import { EVENT_ROUTE, EVENTS_ROUTE, STATUS_ROUTE } from '../paths.ts'
+import type {
+  CalendarEvent,
+  CalendarEventDetail,
+  CalendarEventsData,
+  CalendarResponse,
+  CalendarStatus,
+  CreateEventInput,
+} from '../types.ts'
 import { monthKey, monthRange, shiftMonth } from './month.ts'
 
 /** What the panel is showing. */
 export type CalendarPhase = 'loading' | 'ready' | 'unavailable' | 'error'
+
+/** One open event detail. */
+export interface EventSelection {
+  /** Event the drawer addresses. */
+  readonly eventId: string
+  /** Loading, ready, or failed. */
+  readonly phase: 'loading' | 'ready' | 'error'
+  /** Detail once loaded. */
+  readonly detail?: CalendarEventDetail
+  /** Stable failure code when the read failed. */
+  readonly errorCode?: string
+  /** Feishu link known from the month list, used when the detail answer omits it. */
+  readonly appLink?: string
+}
+
+/** The create dialog. */
+export interface ComposerState {
+  /** Whether the dialog shows. */
+  readonly open: boolean
+  /** Day the dialog prefills, when the user started from a cell. */
+  readonly prefillDate?: string
+  /** True while the create request runs. */
+  readonly pending: boolean
+  /** Stable failure code from the last attempt. */
+  readonly errorCode?: string
+}
 
 /** Snapshot the panel renders; the store replaces it wholesale on each transition. */
 export interface CalendarViewState {
@@ -22,9 +55,15 @@ export interface CalendarViewState {
   userName?: string
   /** Stable failure code from the routes, when the phase is unavailable or error. */
   errorCode?: string
+  /** The open detail drawer, if any. */
+  selection?: EventSelection
+  /** The open create dialog, if any. */
+  composer?: ComposerState
+  /** Event the grid highlights after a successful create. */
+  highlightEventId?: string
 }
 
-/** Month navigation and refresh the panel's buttons call. */
+/** Panel interactions components call. */
 export interface CalendarActions {
   /** Show the previous month. */
   readonly previousMonth: () => void
@@ -34,6 +73,18 @@ export interface CalendarActions {
   readonly goToToday: () => void
   /** Re-read the shown month. */
   readonly refresh: () => void
+  /** Open one event's detail. */
+  readonly openEvent: (eventId: string) => void
+  /** Close the detail drawer. */
+  readonly closeEvent: () => void
+  /** Retry the drawer's detail read. */
+  readonly retryDetail: () => void
+  /** Open the create dialog, optionally prefilled with a day. */
+  readonly openCreate: (date?: string) => void
+  /** Close the create dialog. */
+  readonly closeCreate: () => void
+  /** Submit one event to Feishu. */
+  readonly submitCreate: (input: CreateEventInput) => void
 }
 
 /** A route answer that reported a stable failure code. */
@@ -48,19 +99,22 @@ export class CalendarClientError extends Error {
   }
 }
 
-/** Loads the shown month and keeps the panel's snapshot current. */
+/** Loads the shown month and the open detail, and submits creates. */
 export class CalendarController {
   /** Snapshot store the renderer binds as `useCalendar`. */
   readonly store: SnapshotStore<CalendarViewState>
 
-  /** Buttons' actions. */
+  /** Components' actions. */
   readonly actions: CalendarActions
 
   /** Route fetcher; tests replace it. */
   private readonly fetcher: typeof fetch
 
-  /** Read in flight, cancelled when another month is shown. */
+  /** Month read in flight, cancelled when another month is shown. */
   private abort: AbortController | undefined
+
+  /** Detail read in flight, cancelled when the drawer closes. */
+  private detailAbort: AbortController | undefined
 
   /**
    * @param fetcher - same-origin fetch used for the relative routes.
@@ -74,10 +128,26 @@ export class CalendarController {
       events: [],
     })
     this.actions = {
-      previousMonth: () => { this.showMonth(shiftMonth(this.store.getSnapshot().month, -1)) },
-      nextMonth: () => { this.showMonth(shiftMonth(this.store.getSnapshot().month, 1)) },
+      previousMonth: () => { this.showMonth(shiftMonth(this.current().month, -1)) },
+      nextMonth: () => { this.showMonth(shiftMonth(this.current().month, 1)) },
       goToToday: () => { this.showMonth(monthKey(new Date())) },
       refresh: () => { this.load() },
+      openEvent: (eventId) => { this.openEvent(eventId) },
+      closeEvent: () => {
+        this.detailAbort?.abort()
+        const { selection: _dropped, ...rest } = this.current()
+        this.store.set(rest)
+      },
+      retryDetail: () => {
+        const selection = this.current().selection
+        if (selection !== undefined) this.openEvent(selection.eventId)
+      },
+      openCreate: (date) => { this.openCreate(date) },
+      closeCreate: () => {
+        const { composer: _dropped, ...rest } = this.current()
+        this.store.set(rest)
+      },
+      submitCreate: (input) => { void this.submitCreate(input) },
     }
   }
 
@@ -86,9 +156,15 @@ export class CalendarController {
     void this.read()
   }
 
-  /** Cancel the read in flight; the panel is going away. */
+  /** Cancel reads in flight; the panel is going away. */
   dispose(): void {
     this.abort?.abort()
+    this.detailAbort?.abort()
+  }
+
+  /** The current snapshot. */
+  private current(): CalendarViewState {
+    return this.store.getSnapshot()
   }
 
   /**
@@ -96,7 +172,7 @@ export class CalendarController {
    * @param month - month key in `YYYY-MM`.
    */
   private showMonth(month: string): void {
-    this.store.set({ ...this.store.getSnapshot(), month })
+    this.store.set({ ...this.current(), month })
     this.load()
   }
 
@@ -106,21 +182,17 @@ export class CalendarController {
     const abort = new AbortController()
     this.abort = abort
     const { signal } = abort
-    const shown = this.store.getSnapshot()
+    const shown = this.current()
     this.store.set({ ...shown, phase: 'loading' })
     const range = monthRange(shown.month, shown.weekStart)
     try {
       const status = await this.request<CalendarStatus>(STATUS_ROUTE, signal)
       if (signal.aborted) return
       const named = status.userName === undefined
-        ? { phase: shown.phase, month: shown.month, weekStart: status.weekStart, events: shown.events }
-        : { phase: shown.phase, month: shown.month, weekStart: status.weekStart, events: shown.events, userName: status.userName }
+        ? { ...shown, weekStart: status.weekStart }
+        : { ...shown, weekStart: status.weekStart, userName: status.userName }
       if (!status.connected) {
-        this.store.set({
-          ...named,
-          phase: 'unavailable',
-          errorCode: status.missingScopes.length > 0 ? 'permission-denied' : 'not-connected',
-        })
+        this.store.set({ ...named, phase: 'unavailable', errorCode: status.missingScopes.length > 0 ? 'permission-denied' : 'not-connected' })
         return
       }
       const data = await this.request<CalendarEventsData>(`${EVENTS_ROUTE}?start=${range.start}&end=${range.end}`, signal)
@@ -128,8 +200,81 @@ export class CalendarController {
       this.store.set({ ...named, phase: 'ready', events: data.events })
     } catch (error: unknown) {
       if (signal.aborted) return
-      const code = error instanceof CalendarClientError ? error.code : 'upstream'
-      this.store.set({ ...shown, phase: 'error', errorCode: code })
+      this.store.set({ ...shown, phase: 'error', errorCode: codeOf(error) })
+    }
+  }
+
+  /**
+   * Read one event's detail into the drawer.
+   * @param eventId - the event the user opened.
+   */
+  private openEvent(eventId: string): void {
+    this.detailAbort?.abort()
+    const abort = new AbortController()
+    this.detailAbort = abort
+    const listed = this.current().events.find(event => event.eventId === eventId)?.appLink
+    this.store.set({
+      ...this.current(),
+      selection: { eventId, phase: 'loading', ...(listed === undefined ? {} : { appLink: listed }) },
+    })
+    void this.readDetail(eventId, abort.signal)
+  }
+
+  /**
+   * Fill the open drawer with the detail answer.
+   * @param eventId - event addressed by the drawer.
+   * @param signal - read cancellation.
+   */
+  private async readDetail(eventId: string, signal: AbortSignal): Promise<void> {
+    try {
+      const data = await this.request<CalendarEventDetail>(`${EVENT_ROUTE}?eventId=${encodeURIComponent(eventId)}`, signal)
+      if (signal.aborted) return
+      this.store.set({ ...this.current(), selection: { eventId, phase: 'ready', detail: data } })
+    } catch (error: unknown) {
+      if (signal.aborted) return
+      this.store.set({ ...this.current(), selection: { eventId, phase: 'error', errorCode: codeOf(error) } })
+    }
+  }
+
+  /**
+   * Open the create dialog.
+   * @param date - day to prefill, when the user started from a cell.
+   */
+  private openCreate(date: string | undefined): void {
+    this.store.set({
+      ...this.current(),
+      composer: { open: true, pending: false, ...(date === undefined ? {} : { prefillDate: date }) },
+    })
+  }
+
+  /**
+   * Create one event and fold the result back into the grid.
+   * @param input - validated form values.
+   */
+  private async submitCreate(input: CreateEventInput): Promise<void> {
+    const composer = this.current().composer
+    if (composer === undefined || composer.pending) return
+    this.store.set({ ...this.current(), composer: { ...composer, pending: true } })
+    try {
+      const data = await this.request<{ eventId: string }>(EVENTS_ROUTE, undefined, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      const { composer: _dropped, ...rest } = this.current()
+      this.store.set({ ...rest, highlightEventId: data.eventId })
+      this.load()
+    } catch (error: unknown) {
+      const current = this.current()
+      this.store.set({
+        ...current,
+        composer: {
+          open: true,
+          pending: false,
+          errorCode: codeOf(error),
+          ...(composer.prefillDate === undefined ? {} : { prefillDate: composer.prefillDate }),
+        },
+      })
     }
   }
 
@@ -137,16 +282,30 @@ export class CalendarController {
    * Read one route.
    * @param route - browser-relative route, including its query string.
    * @param signal - read cancellation.
+   * @param init - extra fetch options, such as method and body.
    * @returns the successful payload.
    * @throws CalendarClientError for a failure envelope or an unreadable answer.
    */
-  private async request<T>(route: string, signal: AbortSignal): Promise<T> {
-    const response = await this.fetcher(route, { signal, headers: { accept: 'application/json' } })
+  private async request<T>(route: string, signal: AbortSignal | undefined, init?: RequestInit): Promise<T> {
+    const response = await this.fetcher(route, {
+      ...init,
+      ...(signal === undefined ? {} : { signal }),
+      headers: { accept: 'application/json', ...(init?.headers ?? {}) },
+    })
     const body: unknown = await response.json()
     if (!isResponse(body)) throw new CalendarClientError('upstream', 'feishu-calendar route answered malformed JSON')
     if (body.ok === false) throw new CalendarClientError(body.error.code, body.error.message)
     return body.data as T
   }
+}
+
+/**
+ * Read the stable code off a thrown value.
+ * @param error - value caught from a route call.
+ * @returns the code, or `upstream` for anything unclassified.
+ */
+function codeOf(error: unknown): string {
+  return error instanceof CalendarClientError ? error.code : 'upstream'
 }
 
 /**

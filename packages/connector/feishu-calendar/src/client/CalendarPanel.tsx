@@ -1,17 +1,20 @@
-/** The calendar panel: month navigation, state cards, and the month grid. */
+/** The calendar panel: month navigation, today's agenda, the grid, and the dialogs. */
 
 import type { ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { CalendarActions, CalendarViewState } from './controller.ts'
+import { AgendaStrip } from './AgendaStrip.tsx'
+import { CreateDialog } from './CreateDialog.tsx'
+import { EventDetail } from './EventDetail.tsx'
 import { MonthGrid } from './MonthGrid.tsx'
+import type { CalendarActions, CalendarViewState } from './controller.ts'
 import css from './CalendarPanel.module.css'
 
 /** Registration-side face the panel's slot entry injects. */
 export interface CalendarFace {
   /** Panel snapshot, bound by the renderer as `useCalendar`. */
   readonly hooks: { readonly calendar: SnapshotStore<CalendarViewState> }
-  /** Month navigation and refresh. */
+  /** Month navigation, detail, and create actions. */
   readonly actions: CalendarActions
 }
 
@@ -28,16 +31,18 @@ export type CalendarPanelProps =
  */
 export function CalendarPanel(props: CalendarPanelProps): ReactNode {
   const state = props.useCalendar(snapshot => snapshot)
+  const { actions } = props
   return (
     <section className={css.panel} aria-label={props.t('title')}>
       <header className={css.header}>
         <h2 className={css.title}>{props.t('title')}</h2>
         <span className={css.month}>{formatMonth(state.month)}</span>
         <div className={css.controls}>
-          <button type="button" aria-label={props.t('previousMonth')} onClick={props.actions.previousMonth}>‹</button>
-          <button type="button" onClick={props.actions.goToToday}>{props.t('today')}</button>
-          <button type="button" aria-label={props.t('nextMonth')} onClick={props.actions.nextMonth}>›</button>
-          <button type="button" onClick={props.actions.refresh}>{props.t('refresh')}</button>
+          <button type="button" aria-label={props.t('previousMonth')} onClick={actions.previousMonth}>‹</button>
+          <button type="button" onClick={actions.goToToday}>{props.t('today')}</button>
+          <button type="button" aria-label={props.t('nextMonth')} onClick={actions.nextMonth}>›</button>
+          <button type="button" onClick={actions.refresh}>{props.t('refresh')}</button>
+          <button type="button" className={css.newEvent} onClick={() => { actions.openCreate() }}>{props.t('newEvent')}</button>
         </div>
       </header>
       {state.phase === 'loading' ? <p className={css.notice} role="status">{props.t('loading')}</p> : null}
@@ -45,12 +50,37 @@ export function CalendarPanel(props: CalendarPanelProps): ReactNode {
       {state.phase === 'error' ? (
         <p className={css.notice} role="alert">
           {state.errorCode === 'cli-missing' ? props.t('cliMissing') : props.t('error')}
-          <button type="button" className={css.retry} onClick={props.actions.refresh}>{props.t('retry')}</button>
+          <button type="button" className={css.retry} onClick={actions.refresh}>{props.t('retry')}</button>
         </p>
       ) : null}
-      {state.phase === 'ready'
-        ? <MonthGrid month={state.month} weekStart={state.weekStart} events={state.events} t={props.t} />
-        : null}
+      {state.phase === 'ready' ? (
+        <>
+          <AgendaStrip events={state.events} t={props.t} onOpen={actions.openEvent} />
+          <MonthGrid
+            month={state.month}
+            weekStart={state.weekStart}
+            events={state.events}
+            t={props.t}
+            highlightEventId={state.highlightEventId}
+            onOpenEvent={actions.openEvent}
+            onCreate={actions.openCreate}
+          />
+        </>
+      ) : null}
+      {state.selection === undefined
+        ? null
+        : <EventDetail selection={state.selection} t={props.t} onClose={actions.closeEvent} onRetry={actions.retryDetail} />}
+      {state.composer === undefined
+        ? null
+        : (
+          <CreateDialog
+            composer={state.composer}
+            t={props.t}
+            events={state.events}
+            onCancel={actions.closeCreate}
+            onSubmit={actions.submitCreate}
+          />
+        )}
     </section>
   )
 }

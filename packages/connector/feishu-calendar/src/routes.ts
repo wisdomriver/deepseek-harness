@@ -43,7 +43,7 @@ export function calendarRoutes(deps: CalendarRouteDeps): readonly CalendarRoute[
       path: STATUS_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: request => answer(deps, request, async () => ({ status: await deps.service.status() })),
+      fetch: request => answer(deps, request, () => deps.service.status()),
     },
     {
       path: EVENTS_PATH,
@@ -82,9 +82,7 @@ async function answer(
   const requestId = randomUUID()
   const startedAt = Date.now()
   try {
-    const value = await handle()
-    const data = isStatusWrapper(value) ? value.status : value
-    return json({ ok: true, data }, 200)
+    return json({ ok: true, data: await handle() }, 200)
   } catch (error: unknown) {
     const code = calendarCodeOf(error)
     deps.log?.(`feishu-calendar: ${request.method} ${new URL(request.url).pathname} failed with ${code} after ${Date.now() - startedAt} ms (requestId ${requestId})`)
@@ -136,15 +134,6 @@ async function readCreateBody(request: Request): Promise<CreateEventInput> {
     timezone,
     ...(typeof description === 'string' ? { description } : {}),
   }
-}
-
-/**
- * Test the status handler's wrapper.
- * @param value - handler return value.
- * @returns true when the value holds the status payload under `status`.
- */
-function isStatusWrapper(value: unknown): value is { readonly status: unknown } {
-  return typeof value === 'object' && value !== null && 'status' in value
 }
 
 /**

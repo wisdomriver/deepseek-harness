@@ -438,6 +438,7 @@ function toDetail(raw: Record<string, unknown>, recurrence: string | undefined):
     ...optional('organizer', organizer),
     ...optional('description', asString(raw.description)),
     ...optional('recurrence', recurrence),
+    ...optional('selfRsvpStatus', asString(raw.self_rsvp_status)),
   }
 }
 

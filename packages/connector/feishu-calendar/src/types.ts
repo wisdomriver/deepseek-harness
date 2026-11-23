@@ -33,6 +33,8 @@ export interface CalendarEventDetail extends CalendarEvent {
   readonly description?: string
   /** RFC 5545 rule without the `RRULE:` prefix; only recurring masters carry it. */
   readonly recurrence?: string
+  /** The signed-in user's response: `accept`, `decline`, `tentative`, or `needs_action`. */
+  readonly selfRsvpStatus?: string
 }
 
 /** CLI, account, and authorization facts the panel needs to choose between its states. */

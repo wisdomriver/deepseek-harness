@@ -58,3 +58,8 @@
 .retry {
   margin-left: 8px;
 }
+
+.newEvent {
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-brand-primary);
+}
