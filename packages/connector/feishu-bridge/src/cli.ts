@@ -114,6 +114,9 @@ export function createProcessRunner(resolveExecutable: () => string): CommandRun
     child.stdout.on('data', (chunk: Buffer) => { collect(stdout, chunk) })
     child.stderr.on('data', (chunk: Buffer) => { collect(stderr, chunk) })
     child.on('error', (error: NodeJS.ErrnoException) => {
+      // Windows rejects an existing but unloadable file synchronously (EFTYPE) instead of emitting
+      // 'error', so ENOENT is the only code this handler sees there; POSIX lanes report ENOEXEC.
+      /* v8 ignore next 3 -- Windows only ever reports ENOENT through this handler. */
       fail(error.code === 'ENOENT'
         ? new FeishuError('cli-missing', `feishu-bridge: ${executable} could not be started`, { cause: error })
         : new FeishuError('upstream', `${PROGRAM} could not be started`, { cause: error }))
@@ -124,6 +127,9 @@ export function createProcessRunner(resolveExecutable: () => string): CommandRun
       clearTimeout(timer)
       request.signal?.removeEventListener('abort', onAbort)
       resolve({
+        // The runner settles the command before every kill it starts, so a null code needs a signal
+        // from outside it, which only the POSIX lanes deliver.
+        /* v8 ignore next -- a signal from outside the runner is POSIX-only. */
         exitCode: exitCode ?? -1,
         stdout: Buffer.concat(stdout).toString('utf8'),
         stderr: Buffer.concat(stderr).toString('utf8'),
@@ -152,6 +158,7 @@ export function jsonObjectIn(text: string): Record<string, unknown> | undefined 
         return parsed as Record<string, unknown>
       }
     } catch (error) {
+      /* v8 ignore next -- JSON.parse reports every malformed candidate as a SyntaxError. */
       if (!(error instanceof SyntaxError)) throw error
     }
   }

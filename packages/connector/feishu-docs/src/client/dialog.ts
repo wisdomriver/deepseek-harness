@@ -34,6 +34,7 @@ export function useDialogFocus(panel: RefObject<HTMLElement | null>, onClose: ()
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
+      /* v8 ignore next -- jsdom and browsers report an HTMLElement; the guard covers foreign-document focus targets. */
       if (previous instanceof HTMLElement) previous.focus()
     }
   }, [panel, onClose])

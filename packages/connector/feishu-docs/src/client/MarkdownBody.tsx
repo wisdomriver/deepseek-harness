@@ -46,8 +46,10 @@ function renderNode(node: MarkdownNode): ReactNode {
       return <pre className={css.code}><code>{node.text}</code></pre>
     case 'table':
       return renderTable(node.rows)
+    /* v8 ignore start -- the switch covers every MarkdownNode kind; this arm makes a new kind a compile error. */
     default:
       return null
+    /* v8 ignore stop */
   }
 }
 

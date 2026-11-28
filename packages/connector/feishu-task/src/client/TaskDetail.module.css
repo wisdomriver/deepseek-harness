@@ -14,6 +14,8 @@
   width: min(420px, 92vw);
   height: 100%;
   padding: 16px 18px;
+    --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   overflow: auto;
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-elevation-panel);

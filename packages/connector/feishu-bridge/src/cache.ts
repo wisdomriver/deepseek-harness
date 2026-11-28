@@ -92,6 +92,7 @@ export class BridgeCache implements CacheStore {
     this.entries.set(key, entry)
     while (this.entries.size > this.limit) {
       const oldest = this.entries.keys().next()
+      /* v8 ignore next -- the loop condition proves the map holds a key, so the iterator cannot be done. */
       if (oldest.done === true) return
       this.entries.delete(oldest.value)
     }

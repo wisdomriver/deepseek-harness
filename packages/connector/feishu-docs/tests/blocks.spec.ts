@@ -1,7 +1,8 @@
-// Block XML scanning: ids, plain text, editability, resource detection, and escaping.
+// Block XML scanning: ids, plain text, editability, resource detection, escaping, and
+// the tolerated malformations a real `with-ids` document carries.
 
 import { describe, expect, it } from 'vitest'
-import { escapeXmlText, isEditableTag, parseDocumentXml, renderBlockXml } from '../src/blocks.ts'
+import { decodeXmlEntities, escapeXmlText, isEditableTag, parseDocumentXml, renderBlockXml } from '../src/blocks.ts'
 
 describe('parseDocumentXml', () => {
   it('reads the title and text blocks with decoded plain text', () => {
@@ -58,6 +59,61 @@ describe('parseDocumentXml', () => {
   it('recognizes only the documented editable tags', () => {
     for (const tag of ['h1', 'h6', 'p', 'li', 'code', 'quote']) expect(isEditableTag(tag)).toBe(true)
     for (const tag of ['img', 'sheet', 'table', 'blockquote', 'title']) expect(isEditableTag(tag)).toBe(false)
+  })
+})
+
+describe('parseDocumentXml malformed input', () => {
+  it('keeps the frames the document never closed', () => {
+    expect(parseDocumentXml('<p id="p1">unclosed').blocks).toEqual([
+      { blockId: 'p1', tag: 'p', text: 'unclosed', editable: true },
+    ])
+    expect(parseDocumentXml('<title id="t1">Half').title).toBe('Half')
+  })
+
+  it('omits a title that carries no text', () => {
+    const parsed = parseDocumentXml('<title id="t1"></title><p id="p1">x</p>')
+    expect(parsed.title).toBeUndefined()
+    expect(parsed.blocks).toEqual([{ blockId: 'p1', tag: 'p', text: 'x', editable: true }])
+  })
+
+  it('ignores stray closing tags and text outside every element', () => {
+    expect(parseDocumentXml('</p>orphan<p id="p1">x</p>tail')).toEqual({
+      blocks: [{ blockId: 'p1', tag: 'p', text: 'x', editable: true }],
+    })
+  })
+
+  it('closes every frame a mismatched closing tag covers', () => {
+    expect(parseDocumentXml('<p id="p1"><h2 id="h2">x</p>').blocks).toEqual([
+      { blockId: 'h2', tag: 'h2', text: 'x', editable: true },
+      { blockId: 'p1', tag: 'p', text: 'x', editable: true },
+    ])
+  })
+
+  it('lists a self-closing non-resource block read-only and skips one without an id', () => {
+    expect(parseDocumentXml('<ul><col/><li id="l1">one</li></ul><hr id="r1"/>').blocks).toEqual([
+      { blockId: 'l1', tag: 'li', text: 'one', editable: true },
+      { blockId: 'r1', tag: 'hr', text: '', editable: false },
+    ])
+  })
+
+  it('marks the enclosing text block when a resource element opens inside it', () => {
+    expect(parseDocumentXml('<p id="p1">a<whiteboard id="w1"></whiteboard>b</p>').blocks).toEqual([
+      { blockId: 'w1', tag: 'whiteboard', text: '', editable: false },
+      { blockId: 'p1', tag: 'p', text: 'ab', editable: false },
+    ])
+  })
+
+  it('folds Windows newlines from <br> and keeps only the edges trimmed', () => {
+    expect(parseDocumentXml('<p id="p1">\r\nfirst<br/>second\r\n</p>').blocks).toEqual([
+      { blockId: 'p1', tag: 'p', text: 'first\nsecond', editable: true },
+    ])
+  })
+})
+
+describe('entity decoding', () => {
+  it('decodes the five entities the document XML uses', () => {
+    expect(decodeXmlEntities('&lt;a&gt; &quot;b&quot; &#39;c&#39; &amp; &nbsp;'))
+      .toBe('<a> "b" \'c\' & &nbsp;')
   })
 })
 

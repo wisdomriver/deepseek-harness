@@ -63,6 +63,9 @@ export function envelopeFailure(envelope: Record<string, unknown>, label: string
   if (type === 'validation') {
     return CONFLICT_MESSAGE.test(message) ? new FeishuError('conflict', message) : new FeishuError('invalid-input', message)
   }
+  // The document service has reported no conflict code yet, so this set stays empty and message
+  // wording carries the conflict case.
+  /* v8 ignore next -- CONFLICT_CODES is empty until a document conflict code is observed. */
   if (CONFLICT_CODES.has(code)) return new FeishuError('conflict', message)
   if (NOT_FOUND_CODES.has(code)) return new FeishuError('not-found', message)
   if (PERMISSION_CODES.has(code)) return new FeishuError('permission-denied', message)

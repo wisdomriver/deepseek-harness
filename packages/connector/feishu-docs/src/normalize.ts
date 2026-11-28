@@ -23,10 +23,12 @@ export function parseHighlighted(raw: string): readonly HighlightSegment[] {
   const segments: HighlightSegment[] = []
   let cursor = 0
   for (const match of raw.matchAll(HIGHLIGHT)) {
+    /* v8 ignore next -- String#matchAll always reports the match index; the loop cursor is never needed. */
     const start = match.index ?? cursor
     if (start > cursor) {
       segments.push({ text: decodeEntities(raw.slice(cursor, start)), highlighted: false })
     }
+    /* v8 ignore next -- a matched HIGHLIGHT always participates in its text group. */
     segments.push({ text: decodeEntities(match[1] ?? ''), highlighted: true })
     cursor = start + match[0].length
   }
@@ -56,6 +58,7 @@ export function docTypeOf(entityType: string | undefined, docTypes: string | und
   if (entityType?.toUpperCase() === 'WIKI') return 'wiki'
   const source = (docTypes ?? fileType ?? '').trim()
   if (source === '') return 'file'
+  /* v8 ignore next -- a non-empty source split always yields a first segment. */
   const first = source.split(',')[0]?.trim().toLowerCase() ?? ''
   return first === '' ? 'file' : first
 }

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-// Detail drawer: fields, Feishu link, description fold, completion, Escape, and focus handling.
+// Detail drawer: fields, Feishu link, description fold, completion, Escape, focus handling,
+// the loading state, and the fields an answer may omit.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TaskDetail } from '../src/client/TaskDetail.tsx'
+import { formatDue, formatTimestamp } from '../src/client/format.ts'
 import { en, type TaskLocaleKey } from '../src/client/locales.ts'
 import type { TaskDetail as TaskDetailData } from '../src/types.ts'
 
@@ -114,5 +116,60 @@ describe('TaskDetail', () => {
     render(<TaskDetail {...failed} />)
     fireEvent.click(screen.getByRole('button', { name: en.retry }))
     expect(failed.onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the loading notice under the task id it was opened for', () => {
+    render(<TaskDetail {...props({ taskId: 't1', phase: 'loading' })} />)
+    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(en.loading)
+    expect(screen.queryByRole('button', { name: en.complete })).toBeNull()
+  })
+
+  it('renders the fields an answer does carry and omits the rest', () => {
+    const sparse: TaskDetailData = {
+      taskId: 't1',
+      summary: 'Ship it',
+      status: 'todo',
+      completedAt: new Date(2026, 10, 9, 12, 0, 0).toISOString(),
+      parentTaskId: 't_parent_long_id',
+      assignees: [],
+      followers: ['ou_follower_long_id'],
+      tasklists: [],
+    }
+    render(<TaskDetail {...props({ taskId: 't1', phase: 'ready', detail: sparse })} />)
+    expect(screen.getByText(formatTimestamp(sparse.completedAt ?? ''))).toBeTruthy()
+    expect(screen.getByText('t_paren…')).toBeTruthy()
+    expect(screen.getByText('ou_foll…')).toBeTruthy()
+    expect(screen.queryByText(en.allDay)).toBeNull()
+    expect(screen.queryByText(en.detailDescription)).toBeNull()
+    expect(screen.queryByText(en.detailSubtasks)).toBeNull()
+    expect(screen.queryByText(en.detailUpdated)).toBeNull()
+    expect(screen.queryByRole('link', { name: en.openInFeishu })).toBeNull()
+  })
+
+  it('names a task without a title by the panel title', () => {
+    render(
+      <TaskDetail
+        {...props({ taskId: 't1', phase: 'ready', detail: { ...DETAIL, summary: '' } })}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
+  })
+
+  it('links to Feishu through the list row when the detail answer omits the link', () => {
+    const { appLink: _omitted, ...withoutLink } = DETAIL
+    render(
+      <TaskDetail
+        {...props({ taskId: 't1', phase: 'ready', detail: withoutLink, appLink: 'https://applink.feishu.cn/client/todo/detail?guid=t1' })}
+      />,
+    )
+    expect(screen.getByRole('link', { name: en.openInFeishu }).getAttribute('href'))
+      .toBe('https://applink.feishu.cn/client/todo/detail?guid=t1')
+  })
+
+  it('marks a timed due without the all-day tag', () => {
+    render(<TaskDetail {...props({ taskId: 't1', phase: 'ready', detail: { ...DETAIL, dueAllDay: false } })} />)
+    expect(screen.queryByText(en.allDay)).toBeNull()
+    expect(screen.getByText(formatDue(DETAIL.dueAt ?? '', false))).toBeTruthy()
   })
 })

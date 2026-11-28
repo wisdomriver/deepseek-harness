@@ -222,6 +222,7 @@ export function DocPanelView({ state, t, actions }: DocPanelViewProps): ReactNod
           <DocCreateDialog
             composer={state.composer}
             t={t}
+            /* v8 ignore next -- the ternary arm runs only with a non-empty breadcrumb list, whose last entry has a name. */
             {...(state.crumbs.length === 0 ? {} : { parentName: state.crumbs[state.crumbs.length - 1]?.name ?? '' })}
             onCancel={actions.closeCreate}
             onSubmit={actions.submitCreate}

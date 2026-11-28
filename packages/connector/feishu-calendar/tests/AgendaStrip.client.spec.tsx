@@ -65,4 +65,28 @@ describe('AgendaStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show all' }))
     expect(screen.getByText('Row 6')).toBeTruthy()
   })
+
+  it('stands in a dash for an untitled event and hides the fold when the day fits', () => {
+    render(<AgendaStrip events={[event({ eventId: 'untitled', summary: '', allDay: true, start: today, end: today })]} t={t} onOpen={() => {}} />)
+    expect(screen.getByText('—')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull()
+  })
+
+  it('orders all-day rows ahead of a timed row listed first', () => {
+    const start = new Date(Date.now() + 60 * 60_000).toISOString()
+    const end = new Date(Date.now() + 120 * 60_000).toISOString()
+    render(
+      <AgendaStrip
+        events={[
+          event({ eventId: 'timed', summary: 'Standup', start, end }),
+          event({ eventId: 'all', summary: 'Holiday', allDay: true, start: today, end: today }),
+        ]}
+        t={t}
+        onOpen={() => {}}
+      />,
+    )
+    const rows = screen.getAllByRole('button').map(row => row.textContent)
+    expect(rows[0]).toContain('Holiday')
+    expect(rows[1]).toContain('Standup')
+  })
 })

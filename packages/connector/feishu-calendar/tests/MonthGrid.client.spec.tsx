@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MonthGrid } from '../src/client/MonthGrid.tsx'
 import { en, type CalendarLocaleKey } from '../src/client/locales.ts'
+import { monthKey, shiftMonth } from '../src/client/month.ts'
 import type { CalendarEvent } from '../src/types.ts'
 
 afterEach(cleanup)
@@ -96,5 +97,121 @@ describe('MonthGrid accents', () => {
     const plain = screen.getByRole('button', { name: /Plain/ }).className
     const colored = screen.getByRole('button', { name: /Colored/ }).className
     expect(colored).not.toBe(plain)
+  })
+})
+
+describe('MonthGrid week start', () => {
+  it('starts the header on the configured first column', () => {
+    const { unmount } = render(<MonthGrid month="2026-11" weekStart="sunday" events={[]} t={t} onOpenEvent={() => {}} />)
+    const format = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+    const sunday = format.format(new Date(Date.UTC(2024, 0, 1) - 86_400_000))
+    expect(screen.getAllByRole('columnheader')[0]?.textContent).toBe(sunday)
+    unmount()
+    render(<MonthGrid month="2026-11" weekStart="monday" events={[]} t={t} onOpenEvent={() => {}} />)
+    const monday = format.format(new Date(Date.UTC(2024, 0, 1)))
+    expect(screen.getAllByRole('columnheader')[0]?.textContent).toBe(monday)
+  })
+})
+
+describe('MonthGrid keyboard', () => {
+  /** Render the November grid and return its cells; the first cell is 2026-10-26. */
+  function grid(handlers: { onCreate?: (date: string) => void } = {}) {
+    render(
+      <MonthGrid
+        month="2026-11"
+        weekStart="monday"
+        events={[]}
+        t={t}
+        onOpenEvent={() => {}}
+        {...(handlers.onCreate === undefined ? {} : { onCreate: handlers.onCreate })}
+      />,
+    )
+    return screen.getAllByRole('gridcell')
+  }
+
+  it('moves the roving focus with the four arrow keys and stops at the edges', () => {
+    const cells = grid()
+    fireEvent.keyDown(cells[0]!, { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(cells[1])
+    fireEvent.keyDown(cells[1]!, { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(cells[0])
+    fireEvent.keyDown(cells[0]!, { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(cells[0])
+    fireEvent.keyDown(cells[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(cells[7])
+    fireEvent.keyDown(cells[7]!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(cells[0])
+    fireEvent.keyDown(cells[0]!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(cells[0])
+  })
+
+  it('jumps to the ends of the row with Home and End', () => {
+    const cells = grid()
+    fireEvent.keyDown(cells[9]!, { key: 'Home' })
+    expect(document.activeElement).toBe(cells[7])
+    fireEvent.keyDown(cells[9]!, { key: 'End' })
+    expect(document.activeElement).toBe(cells[13])
+  })
+
+  it('opens the create dialog for the focused day on Enter', () => {
+    const onCreate = vi.fn()
+    const cells = grid({ onCreate })
+    fireEvent.keyDown(cells[9]!, { key: 'Enter' })
+    expect(onCreate).toHaveBeenCalledWith('2026-11-04')
+  })
+
+  it('opens the create dialog for a clicked cell but not for a click on its chips', () => {
+    const onCreate = vi.fn()
+    const cells = grid({ onCreate })
+    fireEvent.click(cells[0]!)
+    expect(onCreate).toHaveBeenCalledWith('2026-10-26')
+    onCreate.mockClear()
+    const chips = cells[0]!.querySelector('ul')
+    fireEvent.click(chips as HTMLElement)
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('ignores a key it does not handle', () => {
+    const onCreate = vi.fn()
+    const cells = grid({ onCreate })
+    fireEvent.keyDown(cells[0]!, { key: 'Escape' })
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('MonthGrid roving focus', () => {
+  it('starts on the first cell when the shown month holds no today', () => {
+    render(<MonthGrid month={shiftMonth(monthKey(new Date()), 60)} weekStart="monday" events={[]} t={t} onOpenEvent={() => {}} />)
+    const cells = screen.getAllByRole('gridcell')
+    expect(cells[0]?.getAttribute('tabindex')).toBe('0')
+    expect(cells[1]?.getAttribute('tabindex')).toBe('-1')
+  })
+})
+
+describe('MonthGrid chips', () => {
+  it('stands in a dash for an untitled event', () => {
+    render(
+      <MonthGrid
+        month="2026-11"
+        weekStart="monday"
+        events={[event({ eventId: 'untitled', summary: '', allDay: true, start: '2026-11-10', end: '2026-11-10' })]}
+        t={t}
+        onOpenEvent={() => {}}
+      />,
+    )
+    expect(screen.getByText('—')).toBeTruthy()
+  })
+
+  it('offers no fold control when a day fits', () => {
+    render(
+      <MonthGrid
+        month="2026-11"
+        weekStart="monday"
+        events={[event({ eventId: 'one', allDay: true, start: '2026-11-10', end: '2026-11-10' })]}
+        t={t}
+        onOpenEvent={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /more/ })).toBeNull()
   })
 })

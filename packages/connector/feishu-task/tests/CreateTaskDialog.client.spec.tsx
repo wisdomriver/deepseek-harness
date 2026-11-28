@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// Create dialog: validation, the due-date modes, the failure copy, and Escape.
+// Create dialog: validation, the due-date modes, the description, the running state, the
+// failure copy, and Escape.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -100,5 +101,21 @@ describe('CreateTaskDialog', () => {
     expect(screen.getByText(en.createFailed)).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends the description with the title', () => {
+    const { onSubmit } = renderDialog()
+    typeTitle('Buy milk')
+    fireEvent.change(screen.getByLabelText(en.createDescription), { target: { value: '2L, oat' } })
+    fireEvent.click(screen.getByRole('button', { name: en.createSubmit }))
+    expect(onSubmit).toHaveBeenCalledWith({ summary: 'Buy milk', description: '2L, oat' })
+  })
+
+  it('reports progress and holds the form while a create runs', () => {
+    const { onSubmit } = renderDialog({ open: true, pending: true })
+    expect(screen.getByRole('button', { name: en.createSaving }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: en.createCancel }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: en.createSaving }))
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 })

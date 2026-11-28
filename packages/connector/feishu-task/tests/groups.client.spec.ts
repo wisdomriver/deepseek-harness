@@ -75,4 +75,9 @@ describe('groupTasks', () => {
     expect(dueBucket(undefined, NOW)).toBe('none')
     expect(dueBucket('not a date', NOW)).toBe('none')
   })
+
+  it('groups every dated task as later while the clock itself is unreadable', () => {
+    const groups = groupTasks([task('dated', day(0))], new Date('not a clock'))
+    expect(groups.map(group => group.key)).toEqual(['later'])
+  })
 })

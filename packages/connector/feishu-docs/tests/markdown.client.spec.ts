@@ -14,6 +14,10 @@ describe('parseOutline', () => {
   it('ignores non-heading lines', () => {
     expect(parseOutline('#not a heading\nplain')).toEqual([])
   })
+
+  it('reads the sixth level and folds Windows newlines', () => {
+    expect(parseOutline('###### Deep\r\n#Top')).toEqual([{ level: 6, text: 'Deep' }])
+  })
 })
 
 describe('parseMarkdown', () => {
@@ -44,6 +48,19 @@ describe('parseMarkdown', () => {
   it('keeps an ordered list ordered', () => {
     expect(parseMarkdown('1. a\n2. b')).toEqual([{ kind: 'list', ordered: true, items: ['a', 'b'] }])
   })
+
+  it('joins the lines of one block quote', () => {
+    expect(parseMarkdown('> first\n> second')).toEqual([{ kind: 'quote', text: 'first\nsecond' }])
+  })
+
+  it('reads an unclosed fence to the end of the body', () => {
+    expect(parseMarkdown('```\nstill code')).toEqual([{ kind: 'code', text: 'still code' }])
+  })
+
+  it('returns no block for a blank or whitespace-only body', () => {
+    expect(parseMarkdown('')).toEqual([])
+    expect(parseMarkdown('\n  \n')).toEqual([])
+  })
 })
 
 describe('parseInline', () => {
@@ -64,6 +81,15 @@ describe('parseInline', () => {
       { text: ' 推进' },
     ])
   })
+
+  it('drops the trailing run when the text ends at a match', () => {
+    expect(parseInline('**bold**')).toEqual([{ text: 'bold', emphasis: 'bold' }])
+    expect(parseInline('`code`')).toEqual([{ text: 'code', emphasis: 'code' }])
+  })
+
+  it('keeps an unterminated marker literal', () => {
+    expect(parseInline('**unfinished')).toEqual([{ text: '**unfinished' }])
+  })
 })
 
 describe('parseMarkdown tables', () => {
@@ -81,5 +107,21 @@ describe('parseMarkdown tables', () => {
   it('keeps a pipe line inside a paragraph when no separator follows', () => {
     const nodes = parseMarkdown('| not | a table |')
     expect(nodes).toEqual([{ kind: 'paragraph', text: '| not | a table |' }])
+  })
+
+  it('requires a dash in the separator row', () => {
+    expect(parseMarkdown('| a | b |\n| : | : |')).toEqual([
+      { kind: 'paragraph', text: '| a | b |\n| : | : |' },
+    ])
+  })
+
+  it('keeps a table directly below a paragraph inside that paragraph', () => {
+    expect(parseMarkdown('text\n| a |\n|---|')).toEqual([
+      { kind: 'paragraph', text: 'text\n| a |\n|---|' },
+    ])
+  })
+
+  it('reads a single-row table without a header row', () => {
+    expect(parseMarkdown('| only |\n|---|')).toEqual([{ kind: 'table', rows: [['only']] }])
   })
 })

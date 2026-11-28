@@ -133,6 +133,31 @@ describe('status', () => {
     expect(facts.scopes).toEqual(['task:task:read', 'calendar:calendar:read'])
   })
 
+  it('splits a scope list that repeats whitespace and reports an anonymous identity without name or id', async () => {
+    const { service } = serviceOver(() => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        appId: 'cli_test',
+        identities: { user: { status: 'ready', available: true, scope: ' task:task:read  docs:docs:read ' } },
+      }),
+      stderr: '',
+    }))
+    const facts = await service.status()
+    expect(facts.scopes).toEqual(['task:task:read', 'docs:docs:read'])
+    expect(facts).not.toHaveProperty('userName')
+    expect(facts).not.toHaveProperty('openId')
+    expect(facts).toMatchObject({ cli: true, configured: true, connected: true })
+  })
+
+  it('reports no scopes when the answer carries none', async () => {
+    const { service } = serviceOver(() => ({
+      exitCode: 0,
+      stdout: JSON.stringify({ appId: 'cli_test', identities: { user: { status: 'ready', available: true } } }),
+      stderr: '',
+    }))
+    await expect(service.status()).resolves.toMatchObject({ scopes: [] })
+  })
+
   it('reports a signed-out identity as not connected', async () => {
     const { service } = serviceOver(() => authStatus({ available: false, status: 'expired' }))
     await expect(service.status()).resolves.toMatchObject({ connected: false })
@@ -163,5 +188,33 @@ describe('requireScopes', () => {
       .rejects.toMatchObject({ code: 'permission-denied' })
     await expect(service.requireScopes('docs', ['docs:document.content:read']))
       .rejects.toThrow(/docs:document\.content:read/)
+  })
+})
+
+describe('routes', () => {
+  const panelRoute = {
+    path: '/api/feishu-docs/recent',
+    methods: ['GET'] as const,
+    requestBody: 'buffered' as const,
+    fetch: async (): Promise<unknown> => { throw new FeishuError('not-found', 'no such document') },
+  }
+
+  it('wraps a panel route set into the answer Connection registers', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    const routes = service.routes('docs', [panelRoute])
+    expect(routes.map(route => [route.path, route.methods, route.requestBody]))
+      .toEqual([['/api/feishu-docs/recent', ['GET'], 'buffered']])
+    const answer = await routes[0]!.fetch(new Request('https://host/api/feishu-docs/recent'))
+    expect(answer.status).toBe(404)
+    await expect(answer.json()).resolves.toMatchObject({ ok: false, error: { code: 'not-found' } })
+  })
+
+  it('forwards diagnostics to the panel log when one is given', async () => {
+    const lines: string[] = []
+    const { service } = serviceOver(() => succeed({}))
+    const routes = service.routes('docs', [panelRoute], line => lines.push(line))
+    await routes[0]!.fetch(new Request('https://host/api/feishu-docs/recent'))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('feishu-docs: GET /api/feishu-docs/recent failed with not-found')
   })
 })

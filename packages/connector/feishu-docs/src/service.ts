@@ -559,6 +559,7 @@ function iconKeyOf(raw: string | undefined): string | undefined {
   try {
     parsed = JSON.parse(raw)
   } catch (error: unknown) {
+    /* v8 ignore next -- JSON.parse throws only SyntaxError, so the non-syntax rethrow cannot run. */
     if (!(error instanceof SyntaxError)) throw error
     return undefined
   }

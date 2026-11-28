@@ -44,6 +44,7 @@ export function MonthGrid({ month, weekStart, events, t, onOpenEvent, onCreate, 
   const byDay = useMemo(() => eventsByDay(events, cells), [events, cells])
   const weekdays = useMemo(() => weekdayLabels(weekStart), [weekStart])
   const [expanded, setExpanded] = useState<readonly string[]>([])
+  /* v8 ignore next -- gridCells always yields 42 cells, so the empty-string default for an empty grid is unreachable. */
   const [focused, setFocused] = useState(() => cells.find(cell => cell.isToday)?.date ?? cells[0]?.date ?? '')
   const refs = useRef(new Map<string, HTMLDivElement>())
 
@@ -66,12 +67,14 @@ export function MonthGrid({ month, weekStart, events, t, onOpenEvent, onCreate, 
     if (event.key === 'Home') {
       event.preventDefault()
       const start = cells.findIndex(row => row.date === cell.date) - cells.findIndex(row => row.date === cell.date) % COLUMNS
+      /* v8 ignore next -- the row start of a cell index is always inside the 42-cell grid. */
       focusCell(cells[start]?.date ?? cell.date)
       return
     }
     if (event.key === 'End') {
       event.preventDefault()
       const index = cells.findIndex(row => row.date === cell.date)
+      /* v8 ignore next -- the last column of a cell's row is always inside the 42-cell grid. */
       focusCell(cells[index - index % COLUMNS + COLUMNS - 1]?.date ?? cell.date)
       return
     }
@@ -87,6 +90,7 @@ export function MonthGrid({ month, weekStart, events, t, onOpenEvent, onCreate, 
         {weekdays.map(label => <div key={label} className={css.weekday} role="columnheader">{label}</div>)}
       </div>
       {rows(cells).map((week) => {
+        /* v8 ignore next -- rows() chunks the 42 cells into full seven-cell weeks, so every week has a first cell. */
         const rowKey = week[0]?.date ?? 'row'
         return (
           <div key={rowKey} className={css.week} role="row">

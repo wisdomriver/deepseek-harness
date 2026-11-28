@@ -1,24 +1,36 @@
 // @vitest-environment jsdom
-// Panel rendering: the five states, grouped rows, the view switch, search, and row completion.
+// Panel rendering: the five states, grouped rows, the view switch, search, row completion,
+// the injected-face frame, the open drawer, and the open create dialog.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { TaskPanelView, type TaskPanelViewProps } from '../src/client/TaskPanel.tsx'
+import { TaskPanel, TaskPanelView, type TaskPanelProps, type TaskPanelViewProps } from '../src/client/TaskPanel.tsx'
 import type { TaskActions, TaskViewState } from '../src/client/controller.ts'
-import type { Translate } from '../src/client/format.ts'
+import { formatDue, formatTimestamp } from '../src/client/format.ts'
 import { groupTasks } from '../src/client/groups.ts'
-import { en, type TaskLocaleKey } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import type { TaskSummary } from '../src/types.ts'
+import css from '../src/client/TaskPanel.module.css'
+import { fixedHook, standardSeats } from './panel-seats.client.ts'
 
 afterEach(cleanup)
 
-/** Localized copy resolved from the English dictionary. */
-const t: Translate = (key: TaskLocaleKey, params?: Record<string, unknown>): string =>
-  Object.entries(params ?? {}).reduce(
+/** English copy addressed by every dictionary key a panel entry may ask for. */
+const COPY: Readonly<Record<string, string>> = en
+
+/**
+ * Localized copy resolved from the English dictionary.
+ * @param key - dictionary key the panel asks for; shared-vocabulary keys fall back to the key.
+ * @param params - template parameters.
+ * @returns the resolved copy.
+ */
+function t(key: string, params?: Record<string, unknown>): string {
+  return Object.entries(params ?? {}).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
-    en[key],
+    COPY[key] ?? key,
   )
+}
 
 /** Actions every render receives; each test asserts the ones it uses. */
 function actions(): TaskActions {
@@ -185,5 +197,106 @@ describe('TaskPanel list', () => {
     expect(rendered.actions.openTask).toHaveBeenCalledWith('a')
     fireEvent.click(screen.getByRole('button', { name: en.newTask }))
     expect(rendered.actions.openCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('names an unconfigured Feishu app apart from a signed-out account', () => {
+    renderPanel({ phase: 'disconnected', errorCode: 'not-configured' })
+    expect(screen.getByText(en.notConfigured)).toBeTruthy()
+    expect(screen.queryByText(en.disconnected)).toBeNull()
+  })
+
+  it('reports a failed write above the list and keeps the rows', () => {
+    renderPanel({ tasks: [task('a', 'Ship it')], actionErrorCode: 'timeout' })
+    expect(screen.getByRole('alert').textContent).toBe(en.actionFailed)
+    expect(screen.getByText('Ship it')).toBeTruthy()
+  })
+
+  it('emphasizes overdue, today, and later due dates', () => {
+    const week = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 9, 0, 0).toISOString()
+    renderPanel({
+      tasks: [
+        task('late', 'Late report', overdue),
+        task('today', 'Ship it', today),
+        task('week', 'Plan', week),
+      ],
+    })
+    expect(screen.getByText(formatDue(overdue, false)).className).toBe(css.dueOverdue)
+    expect(screen.getByText(formatDue(today, false)).className).toBe(css.dueToday)
+    expect(screen.getByText(formatDue(week, false)).className).toBe(css.due)
+  })
+
+  it('shows the optimistic completion and marks the just-created row', () => {
+    const updatedAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 30, 0).toISOString()
+    renderPanel({
+      tasks: [task('a', 'Ship it', undefined, { updatedAt })],
+      marks: { a: { taskId: 'a', status: 'done', pending: true } },
+      highlightTaskId: 'a',
+    })
+    const reopen = screen.getByRole('button', { name: en.reopenAria.replace('{summary}', 'Ship it') })
+    expect(reopen.getAttribute('aria-pressed')).toBe('true')
+    expect(reopen.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText(formatTimestamp(updatedAt))).toBeTruthy()
+    expect(screen.getByRole('listitem').className).toBe(css.rowHighlighted)
+  })
+
+  it('names a task Feishu returned without a title', () => {
+    renderPanel({ tasks: [task('a', '')] })
+    expect(screen.getByText(en.untitled)).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.completeAria.replace('{summary}', en.untitled) })).toBeTruthy()
+  })
+
+  it('opens the detail drawer and the create dialog from the snapshot', () => {
+    renderPanel({
+      tasks: [task('a', 'Ship it')],
+      selection: { taskId: 'a', phase: 'loading' },
+      composer: { open: true, pending: false },
+    })
+    expect(screen.getByRole('dialog', { name: en.title })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: en.createTitle })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe(en.loading)
+  })
+})
+
+describe('TaskPanel frame', () => {
+  /**
+   * Render the registered panel component over one snapshot.
+   * @param state - snapshot fields this test sets.
+   * @param canNavigate - whether the Plugins page can be opened from the panel.
+   * @returns the render result.
+   */
+  function renderFrame(state: Partial<TaskViewState>, canNavigate = false) {
+    const store = createSnapshotStore<TaskViewState>({
+      phase: 'ready',
+      view: 'pending',
+      query: '',
+      tasks: [],
+      missingScopes: [],
+      marks: {},
+      ...state,
+      groups: state.groups ?? groupTasks(state.tasks ?? []),
+    })
+    const connectFeishu = vi.fn()
+    const props: TaskPanelProps = {
+      ...standardSeats,
+      useTask: fixedHook(store.getSnapshot()),
+      usePluginNavigation: fixedHook(canNavigate),
+      t,
+      actions: actions(),
+      navigation: { connectFeishu },
+    }
+    return { ...render(<TaskPanel {...props} />), connectFeishu }
+  }
+
+  it('binds the injected snapshot to the panel body', () => {
+    renderFrame({ tasks: [task('a', 'Ship it')] })
+    expect(screen.getByRole('region', { name: en.title })).toBeTruthy()
+    expect(screen.getByText('1 tasks')).toBeTruthy()
+    expect(screen.getByText('Ship it')).toBeTruthy()
+  })
+
+  it('offers the connect button only while the injected hook reports Plugins navigation', () => {
+    const rendered = renderFrame({ phase: 'disconnected', errorCode: 'not-connected' }, true)
+    fireEvent.click(screen.getByRole('button', { name: en.connectFeishu }))
+    expect(rendered.connectFeishu).toHaveBeenCalledTimes(1)
   })
 })

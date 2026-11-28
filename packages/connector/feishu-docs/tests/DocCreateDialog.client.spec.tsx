@@ -51,4 +51,48 @@ describe('DocCreateDialog', () => {
     )
     expect(screen.getByText('Could not create the document; try again')).toBeTruthy()
   })
+
+  it('submits a title alone when no initial content was typed', () => {
+    const onSubmit = vi.fn()
+    render(
+      <DocCreateDialog
+        composer={{ open: true, pending: false }}
+        t={t}
+        onCancel={() => {}}
+        onSubmit={onSubmit}
+      />,
+    )
+    expect(screen.getByText(/Location: My space/)).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'New' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    expect(onSubmit).toHaveBeenCalledWith({ title: 'New' })
+  })
+
+  it('asks for a title when the create was refused for one', () => {
+    render(
+      <DocCreateDialog
+        composer={{ open: true, pending: false, errorCode: 'invalid-input' }}
+        t={t}
+        onCancel={() => {}}
+        onSubmit={() => {}}
+      />,
+    )
+    expect(screen.getByText('A title is required')).toBeTruthy()
+  })
+
+  it('cancels from the button and from Escape', () => {
+    const onCancel = vi.fn()
+    render(
+      <DocCreateDialog
+        composer={{ open: true, pending: false }}
+        t={t}
+        onCancel={onCancel}
+        onSubmit={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalledOnce()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalledTimes(2)
+  })
 })

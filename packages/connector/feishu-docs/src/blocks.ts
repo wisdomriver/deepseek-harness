@@ -129,19 +129,24 @@ export function parseDocumentXml(xml: string): { readonly title?: string; readon
   }
 
   for (const match of xml.matchAll(TAG)) {
+    /* v8 ignore next -- String#matchAll always reports the match index; the loop cursor is never needed. */
     const start = match.index ?? cursor
     if (start > cursor) appendText(decodeXmlEntities(xml.slice(cursor, start)))
     cursor = start + match[0].length
     const closing = match[1] === '/'
+    /* v8 ignore next -- a matched TAG always participates in its name group. */
     const tag = match[2] ?? ''
+    /* v8 ignore next -- a matched TAG always participates in its attribute group. */
     const attributes = match[3] ?? ''
     const selfClosing = match[4] === '/' || VOID_TAGS.has(tag)
+    /* v8 ignore next -- TAG requires a leading letter, so this scan never sees an empty tag. */
     if (tag === '') continue
     if (closing) {
       for (let index = frames.length - 1; index >= 0; index -= 1) {
         if (frames[index]?.tag !== tag) continue
         while (frames.length > index) {
           const frame = frames.pop()
+          /* v8 ignore next -- the while bound proves pop() returns a frame. */
           if (frame !== undefined) closeFrame(frame)
         }
         break
@@ -173,6 +178,7 @@ export function parseDocumentXml(xml: string): { readonly title?: string; readon
   if (cursor < xml.length) appendText(decodeXmlEntities(xml.slice(cursor)))
   while (frames.length > 0) {
     const frame = frames.pop()
+    /* v8 ignore next -- the while bound proves pop() returns a frame. */
     if (frame !== undefined) closeFrame(frame)
   }
   return title === undefined ? { blocks } : { title, blocks }

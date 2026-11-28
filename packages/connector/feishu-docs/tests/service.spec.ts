@@ -2,7 +2,7 @@
 // normalization, caching, bounds, block writes, conflict mapping, and creation.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authStatus, fail, searchResult, serviceOver, succeed } from './harness.ts'
+import { authStatus, DOCS_SCOPES, fail, searchResult, serviceOver, succeed } from './harness.ts'
 
 describe('DocsService.status', () => {
   it('reports the scopes the token lacks', async () => {
@@ -19,6 +19,20 @@ describe('DocsService.status', () => {
         'wiki:node:read',
       ],
     })
+  })
+
+  it('omits the user name when the account reports none', async () => {
+    const { service } = serviceOver(() => ({
+      exitCode: 0,
+      stderr: '',
+      stdout: JSON.stringify({
+        appId: 'cli_x',
+        identities: { user: { status: 'ready', available: true, scope: DOCS_SCOPES } },
+      }),
+    }))
+    const status = await service.status()
+    expect(status).not.toHaveProperty('userName')
+    expect(status.missingScopes).toEqual([])
   })
 })
 
@@ -335,5 +349,295 @@ describe('DocsService.create', () => {
     const { service, calls } = serviceOver(() => succeed({}))
     await expect(service.create({ title: 'a'.repeat(201) })).rejects.toMatchObject({ code: 'invalid-input' })
     expect(calls).toHaveLength(0)
+  })
+
+  it('rejects an oversized initial body before starting a process', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.create({ title: 'New', content: 'x'.repeat(20_001) }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('reports unknown-outcome when a synchronous create answers without a document id', async () => {
+    const { service } = serviceOver(() => succeed({ task: {} }))
+    await expect(service.create({ title: 'New' })).rejects.toMatchObject({ code: 'unknown-outcome' })
+  })
+
+  it('polls the task id nested in the task object and reads a document from its result', async () => {
+    vi.useFakeTimers()
+    const { service } = serviceOver(({ args }) => (args[0] === 'docs' && args[1] === '+create'
+      ? succeed({ task: { task_id: 'task1' } })
+      : succeed({
+        task: { status: 'succeeded', result: { doc_id: 'new4', url: 'https://example.test/docx/new4' } },
+      })))
+    const pending = service.create({ title: 'New' })
+    await vi.runAllTimersAsync()
+    await expect(pending).resolves.toEqual({
+      documentId: 'new4',
+      url: 'https://example.test/docx/new4',
+      pending: false,
+    })
+  })
+
+  it('reads the task status from the envelope when the task object omits it', async () => {
+    vi.useFakeTimers()
+    const { service } = serviceOver(({ args }) => (args[0] === 'docs' && args[1] === '+create'
+      ? succeed({ task_id: 'task1' })
+      : succeed({ task: { id: 'task1' }, status: 'running' })))
+    const pending = service.create({ title: 'New' })
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'unknown-outcome' })
+    await vi.runAllTimersAsync()
+    await assertion
+  })
+
+  it('reads the task status off the envelope when the task field is not an object', async () => {
+    vi.useFakeTimers()
+    const { service } = serviceOver(({ args }) => (args[0] === 'docs' && args[1] === '+create'
+      ? succeed({ task_id: 'task1' })
+      : succeed({ task: null, status: 'cancelled' })))
+    const pending = service.create({ title: 'New' })
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'upstream' })
+    await vi.runAllTimersAsync()
+    await assertion
+  })
+
+  it('fails the create when the task reports a failure', async () => {
+    vi.useFakeTimers()
+    const { service } = serviceOver(({ args }) => (args[0] === 'docs' && args[1] === '+create'
+      ? succeed({ task_id: 'task1' })
+      : succeed({ task: { status: 'failed' } })))
+    const pending = service.create({ title: 'New' })
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'upstream' })
+    await vi.runAllTimersAsync()
+    await assertion
+  })
+})
+
+describe('DocsService.files guards', () => {
+  it('rejects an unknown folder ordering before starting a process', async () => {
+    const { service, calls } = serviceOver(() => succeed({ files: [], has_more: false }))
+    await expect(service.files('f1', 'Nope' as 'EditedTime', undefined))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('skips a blank folder token and cursor', async () => {
+    const { service, calls } = serviceOver(() => succeed({ files: [], has_more: false }))
+    await service.files('  ', undefined, ' ')
+    expect(calls[0]?.args).toEqual(['drive', 'files', 'list'])
+  })
+})
+
+describe('DocsService.document guards', () => {
+  it('rejects an unknown read scope', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.document('d1', 'nope' as 'outline')).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('drops the cached body when the read asks for a refresh', async () => {
+    const { service, calls } = serviceOver(() => succeed({
+      document: { content: '# A', document_id: 'd1', revision_id: 1 },
+    }))
+    await service.document('d1', 'outline')
+    await service.document('d1', 'outline')
+    expect(calls).toHaveLength(1)
+    await service.document('d1', 'outline', true)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('reads a fetch answer without content as an empty body', async () => {
+    const { service } = serviceOver(() => succeed({ document: { document_id: 'd1', revision_id: 2 } }))
+    await expect(service.document('d1', 'outline')).resolves.toEqual({
+      mode: 'outline', token: 'd1', content: '', truncated: false, revisionId: 2,
+    })
+    await expect(service.document('d2', 'blocks')).resolves.toEqual({
+      mode: 'blocks', token: 'd2', revisionId: 2, blocks: [],
+    })
+  })
+
+  it('rejects a fetch answer without a document object', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.document('d1', 'outline')).rejects.toMatchObject({ code: 'upstream' })
+  })
+
+  it('rejects a document without a revision', async () => {
+    const { service } = serviceOver(() => succeed({ document: { content: '# A' } }))
+    await expect(service.document('d1', 'outline')).rejects.toMatchObject({ code: 'upstream' })
+  })
+})
+
+describe('DocsService.mutate guards', () => {
+  it('refuses a replace-block without its block id or tag', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'replace-block', token: 'd1', revisionId: 1, content: 'x' }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(service.mutate({
+      action: 'replace-block', token: 'd1', revisionId: 1, blockId: 'b1', content: 'x',
+    })).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('clears a block when the replacement text is absent', async () => {
+    const { service, calls } = serviceOver(() => succeed({ document: { revision_id: 2 }, warnings: [] }))
+    await service.mutate({ action: 'replace-block', token: 'd1', revisionId: 1, blockId: 'b1', tag: 'p' })
+    expect(calls[0]?.args).toContain('<p></p>')
+  })
+
+  it('refuses an oversized replace-block body', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.mutate({
+      action: 'replace-block', token: 'd1', revisionId: 1, blockId: 'b1', tag: 'p', content: 'x'.repeat(20_001),
+    })).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('refuses a delete-block without its block id', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'delete-block', token: 'd1', revisionId: 1 }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+  })
+
+  it('refuses a rename without a title or beyond the title bound', async () => {
+    const { service, calls } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'rename', token: 'd1' })).rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(service.mutate({ action: 'rename', token: 'd1', title: 'a'.repeat(201) }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('refuses a block write without a base revision', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'append', token: 'd1', content: 'x' }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(service.mutate({ action: 'append', token: 'd1', revisionId: -1, content: 'x' }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+  })
+
+  it('refuses an empty or oversized append body', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'append', token: 'd1', revisionId: 1 }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(service.mutate({ action: 'append', token: 'd1', revisionId: 1, content: '   ' }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+    await expect(service.mutate({ action: 'append', token: 'd1', revisionId: 1, content: 'x'.repeat(20_001) }))
+      .rejects.toMatchObject({ code: 'invalid-input' })
+  })
+
+  it('refuses an action outside the closed mutation union', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.mutate({ action: 'move', token: 'd1' } as never))
+      .rejects.toMatchObject({ code: 'internal' })
+  })
+})
+
+describe('DocsService mutation results', () => {
+  it('keeps the revision, result, and block count absent when the answer omits them', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    const result = await service.mutate({ action: 'delete-block', token: 'd1', revisionId: 1, blockId: 'b1' })
+    expect(result).toEqual({ token: 'd1', warnings: [] })
+  })
+
+  it('drops non-string warnings and keeps the block count', async () => {
+    const { service } = serviceOver(() => succeed({
+      document: { revision_id: 3 },
+      warnings: ['one skipped', 7],
+    }))
+    const result = await service.mutate({ action: 'append', token: 'd1', revisionId: 2, content: 'x' })
+    expect(result).toEqual({ token: 'd1', revisionId: 3, warnings: ['one skipped'] })
+  })
+
+  it('omits an unusable revision id', async () => {
+    const { service } = serviceOver(() => succeed({ document: { revision_id: 'stale' }, warnings: [] }))
+    const result = await service.mutate({ action: 'append', token: 'd1', revisionId: 2, content: 'x' })
+    expect(result.revisionId).toBeUndefined()
+  })
+
+  it('maps a non-conflict write failure without dropping cached reads', async () => {
+    const { service } = serviceOver(() => fail({ type: 'api', code: 1, message: 'boom' }))
+    await expect(service.mutate({ action: 'append', token: 'd1', revisionId: 2, content: 'x' }))
+      .rejects.toMatchObject({ code: 'upstream' })
+  })
+})
+
+describe('DocsService list normalization', () => {
+  it('reads an answer with neither results nor files as an empty page', async () => {
+    const { service } = serviceOver(() => succeed({}))
+    await expect(service.recent(30, 'open')).resolves.toMatchObject({ items: [], hasMore: false })
+  })
+
+  it('rejects a row without any token', async () => {
+    const { service } = serviceOver(() => succeed({ results: [{ entity_type: 'DOC' }] }))
+    await expect(service.recent(30, 'open')).rejects.toMatchObject({ code: 'upstream' })
+  })
+
+  it('reads the token from the flat row and the name from the row title field', async () => {
+    const { service } = serviceOver(() => succeed({
+      results: [{ token: 'flat1', name: 'Flat', type: 'SHEET' }],
+    }))
+    const data = await service.recent(30, 'open')
+    expect(data.items[0]).toMatchObject({ token: 'flat1', title: [{ text: 'Flat', highlighted: false }], type: 'sheet' })
+  })
+
+  it('reads the display name from the row when the result metadata has none', async () => {
+    const { service } = serviceOver(() => succeed({
+      results: [{ token: 'r1', name: 'Row', result_meta: {} }],
+    }))
+    const data = await service.recent(30, 'open')
+    expect(data.items[0]?.title).toEqual([{ text: 'Row', highlighted: false }])
+  })
+
+  it('keeps a numeric modified time and a parsed icon key', async () => {
+    const { service } = serviceOver(() => succeed({
+      files: [{ token: 'f1', name: 'X', modified_time: 1_781_530_248, icon_info: '{"key":"docx"}' }],
+    }))
+    const data = await service.files(undefined, undefined, undefined)
+    expect(data.items[0]?.updatedAt).toBe(new Date(1_781_530_248 * 1000).toISOString())
+    expect(data.items[0]?.iconKey).toBe('docx')
+  })
+
+  it('omits an empty URL, an unparsable icon key, and a non-timestamp modification time', async () => {
+    const { service } = serviceOver(() => succeed({
+      files: [{ token: 'f1', name: 'X', url: '', icon_info: 'not json', modified_time: 'soon' }],
+    }))
+    const data = await service.files(undefined, undefined, undefined)
+    expect(data.items[0]).not.toHaveProperty('url')
+    expect(data.items[0]).not.toHaveProperty('iconKey')
+    expect(data.items[0]).not.toHaveProperty('updatedAt')
+  })
+
+  it('drops a non-positive epoch timestamp', async () => {
+    const { service } = serviceOver(() => succeed({ files: [{ token: 'f1', name: 'X', modified_time: 0 }] }))
+    const data = await service.files(undefined, undefined, undefined)
+    expect(data.items[0]?.updatedAt).toBeUndefined()
+  })
+
+  it('accepts a numeric-string revision and rejects a fractional one', async () => {
+    const listed = serviceOver(() => succeed({
+      document: { content: '# A', document_id: 'd1', revision_id: '4' },
+    }))
+    await expect(listed.service.document('d1', 'outline')).resolves.toMatchObject({ revisionId: 4 })
+
+    const fractional = serviceOver(() => succeed({
+      document: { content: '# A', document_id: 'd1', revision_id: 1.5 },
+    }))
+    await expect(fractional.service.document('d1', 'outline')).rejects.toMatchObject({ code: 'upstream' })
+  })
+
+  it('rejects a list answer that is not an object', async () => {
+    const { service } = serviceOver(() => succeed(null))
+    await expect(service.recent(30, 'open')).rejects.toMatchObject({ code: 'upstream' })
+  })
+
+  it('rejects an unknown recent ordering before starting a process', async () => {
+    const { service, calls } = serviceOver(() => succeed({ results: [] }))
+    await expect(service.recent(30, 'nope' as 'open')).rejects.toMatchObject({ code: 'invalid-input' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('falls back to an empty title when no field names one', async () => {
+    const { service } = serviceOver(() => succeed({ results: [{ token: 't1', result_meta: {} }] }))
+    const data = await service.recent(30, 'open')
+    expect(data.items[0]?.title).toEqual([])
   })
 })

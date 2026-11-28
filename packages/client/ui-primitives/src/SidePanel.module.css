@@ -72,6 +72,8 @@
   flex: 1;
   min-height: 0;
   padding: 0 24px 20px;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   overflow-y: auto;
   overscroll-behavior: contain;
 }

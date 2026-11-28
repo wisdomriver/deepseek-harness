@@ -57,6 +57,7 @@ export function parseInline(text: string): readonly InlineNode[] {
   const nodes: InlineNode[] = []
   let cursor = 0
   for (const match of text.matchAll(INLINE)) {
+    /* v8 ignore next -- String#matchAll always reports the match index; the loop cursor is never needed. */
     const start = match.index ?? cursor
     if (start > cursor) nodes.push({ text: text.slice(cursor, start) })
     if (match[1] !== undefined && match[2] !== undefined) {
@@ -64,6 +65,7 @@ export function parseInline(text: string): readonly InlineNode[] {
     } else if (match[3] !== undefined) {
       nodes.push({ text: match[3], emphasis: 'bold' })
     } else {
+      /* v8 ignore next -- the code alternative is the only INLINE arm that leaves group 4, so it always participates. */
       nodes.push({ text: match[4] ?? '', emphasis: 'code' })
     }
     cursor = start + match[0].length
@@ -110,6 +112,7 @@ export function parseOutline(markdown: string): readonly MarkdownHeading[] {
   for (const line of markdown.split(/\r?\n/)) {
     const match = HEADING.exec(line)
     if (match === null) continue
+    /* v8 ignore next -- a matched HEADING always participates in both capture groups. */
     headings.push({ level: match[1]?.length ?? 1, text: (match[2] ?? '').trim() })
   }
   return headings
@@ -125,6 +128,7 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
   const nodes: MarkdownNode[] = []
   let index = 0
   while (index < lines.length) {
+    /* v8 ignore next -- the loop bound proves this line exists. */
     const line = lines[index] ?? ''
     if (line.trim() === '') {
       index += 1
@@ -133,7 +137,9 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
     if (FENCE.test(line)) {
       const code: string[] = []
       index += 1
+      /* v8 ignore next -- the loop bound proves this line exists. */
       while (index < lines.length && !FENCE.test(lines[index] ?? '')) {
+        /* v8 ignore next -- the loop bound proves this line exists. */
         code.push(lines[index] ?? '')
         index += 1
       }
@@ -143,13 +149,16 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
     }
     const heading = HEADING.exec(line)
     if (heading !== null) {
+      /* v8 ignore next -- a matched HEADING always participates in both capture groups. */
       nodes.push({ kind: 'heading', level: heading[1]?.length ?? 1, text: (heading[2] ?? '').trim() })
       index += 1
       continue
     }
     if (QUOTE.test(line)) {
       const quoted: string[] = []
+      /* v8 ignore next -- the loop bound proves this line exists. */
       while (index < lines.length && QUOTE.test(lines[index] ?? '')) {
+        /* v8 ignore next -- the loop bound proves the line and its group exist. */
         quoted.push(QUOTE.exec(lines[index] ?? '')?.[1] ?? '')
         index += 1
       }
@@ -159,7 +168,9 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
     if (LIST.test(line)) {
       const ordered = /^\s*\d+\./.test(line)
       const items: string[] = []
+      /* v8 ignore next -- the loop bound proves this line exists. */
       while (index < lines.length && LIST.test(lines[index] ?? '')) {
+        /* v8 ignore next -- the loop bound proves the line and its group exist. */
         items.push(LIST.exec(lines[index] ?? '')?.[1] ?? '')
         index += 1
       }
@@ -169,7 +180,9 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
     const next = lines[index + 1] ?? ''
     if (isTableRow(line) && isTableSeparator(next)) {
       const rows: string[][] = []
+      /* v8 ignore next -- the loop bound proves this line exists. */
       while (index < lines.length && isTableRow(lines[index] ?? '')) {
+        /* v8 ignore next -- the loop bound proves this line exists. */
         const row = lines[index] ?? ''
         if (!isTableSeparator(row)) rows.push([...splitCells(row)])
         index += 1
@@ -179,6 +192,7 @@ export function parseMarkdown(markdown: string): readonly MarkdownNode[] {
     }
     const paragraph: string[] = []
     while (index < lines.length) {
+      /* v8 ignore next -- the loop bound proves this line exists. */
       const current = lines[index] ?? ''
       if (
         current.trim() === ''

@@ -37,6 +37,7 @@ export function DocDetail({ selection, t, actions, editable }: DocDetailProps): 
   const dirty = isDirty(selection)
   const saving = selection.editor?.saving === true
 
+  /* v8 ignore next -- the render below assigns the real handler before any event can reach the ref. */
   const closeRef = useRef<() => void>(() => {})
   closeRef.current = () => {
     if (saving) return
@@ -58,6 +59,7 @@ export function DocDetail({ selection, t, actions, editable }: DocDetailProps): 
   const url = item.url
   const headings = parseOutline(selection.outline ?? '')
   const copy = (): void => {
+    /* v8 ignore next -- the copy button renders only for a row that carries a URL. */
     if (url === undefined) return
     if (navigator.clipboard === undefined) {
       setCopied('failed')

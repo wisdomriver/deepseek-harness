@@ -1,7 +1,7 @@
 // Envelope reading and failure mapping: stream selection, progress lines, and every stable code.
 
 import { describe, expect, it } from 'vitest'
-import { envelopeFailure, parseEnvelope, requireEnvelopeOk } from '../src/envelope.ts'
+import { asRecord, asString, envelopeFailure, parseEnvelope, requireEnvelopeOk, requireRecord } from '../src/envelope.ts'
 import type { CommandOutcome } from '../src/cli.ts'
 
 /** Build one finished command. */
@@ -61,5 +61,35 @@ describe('envelopeFailure', () => {
   it('keeps a diagnostic for an envelope without a message', () => {
     expect(envelopeFailure({ ok: false }, 'task +search')).toMatchObject({ code: 'upstream' })
     expect(envelopeFailure({ ok: false }, 'task +search').message).toContain('task +search')
+  })
+})
+
+describe('requireRecord', () => {
+  it('returns the object an answer carried', () => {
+    expect(requireRecord({ event_id: 'e1' }, 'event e1')).toEqual({ event_id: 'e1' })
+  })
+
+  it('fails with upstream when the answer is not an object', () => {
+    expect(() => requireRecord([], 'agenda item')).toThrowError(expect.objectContaining({
+      code: 'upstream',
+      message: 'lark-cli returned no agenda item',
+    }))
+    expect(() => requireRecord(undefined, 'agenda item')).toThrowError(/returned no agenda item/)
+  })
+})
+
+describe('asRecord and asString', () => {
+  it('narrows objects and rejects arrays, null, and primitives', () => {
+    expect(asRecord({ a: 1 })).toEqual({ a: 1 })
+    expect(asRecord([1])).toBeUndefined()
+    expect(asRecord(null)).toBeUndefined()
+    expect(asRecord('a')).toBeUndefined()
+  })
+
+  it('keeps strings and drops every other value', () => {
+    expect(asString('value')).toBe('value')
+    expect(asString('')).toBe('')
+    expect(asString(1)).toBeUndefined()
+    expect(asString(undefined)).toBeUndefined()
   })
 })

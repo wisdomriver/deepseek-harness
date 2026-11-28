@@ -76,7 +76,13 @@ export function TaskDetail({ selection, mark, t, onClose, onRetry, onComplete, o
                 </p>
               )}
               <dl className={css.fields}>
-                <Field label={t('detailStatus')} value={status === undefined ? undefined : t(done ? 'statusDone' : 'statusTodo')} />
+                <Field
+                  label={t('detailStatus')}
+                  value={
+                    /* v8 ignore next -- detail.status is non-optional, so this arm only narrows `detail?.status`. */
+                    status === undefined ? undefined : t(done ? 'statusDone' : 'statusTodo')
+                  }
+                />
                 <Field label={t('detailCompletedAt')} value={detail.completedAt === undefined ? undefined : formatTimestamp(detail.completedAt)} />
                 <Field label={t('detailCreator')} value={detail.creator === undefined ? undefined : abbreviateId(detail.creator)} />
                 <Field label={t('detailAssignees')} value={members(detail.assignees)} />

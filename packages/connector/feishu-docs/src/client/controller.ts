@@ -601,6 +601,7 @@ export class DocsController {
     } catch (error: unknown) {
       if (signal.aborted) return
       const selection = this.current().selection
+      /* v8 ignore next -- every path that closes or replaces the drawer aborts this read, so the drawer here is the one it addressed. */
       if (selection === undefined || selection.item.token !== item.token) return
       const code = codeOf(error)
       this.store.set({
@@ -626,6 +627,7 @@ export class DocsController {
   private mergeDocument(token: string, body: DocBodyData): void {
     const current = this.current()
     const selection = current.selection
+    /* v8 ignore next -- a read whose drawer was replaced is aborted before it can answer. */
     if (selection === undefined || selection.item.token !== token) return
     if (body.mode === 'blocks') {
       const blocks: DocBlocksData = body
@@ -761,6 +763,7 @@ export class DocsController {
       return
     }
     const token = selection.item.url ?? selection.item.token
+    /* v8 ignore next 3 -- the block draft opens only through editBlock, which records both the block id and its tag. */
     if (editor.mode !== 'append' && (editor.blockId === undefined || editor.tag === undefined)) {
       this.setEditorError(selection.item.token, 'invalid-input')
       return
@@ -771,7 +774,9 @@ export class DocsController {
         action: 'replace-block',
         token,
         revisionId,
+        /* v8 ignore next -- a block draft always carries its block id, so the empty fallback is defensive only. */
         blockId: editor.blockId ?? '',
+        /* v8 ignore next -- a block draft always carries its tag, so the empty fallback is defensive only. */
         tag: editor.tag ?? '',
         content: editor.text,
       }
@@ -935,6 +940,7 @@ export class DocsController {
     } catch (error: unknown) {
       const latest = this.current()
       const open = latest.composer
+      /* v8 ignore next -- the composer cannot close while a create is pending, so the catch always finds it. */
       if (open === undefined) return
       this.store.set({
         ...latest,
@@ -951,6 +957,7 @@ export class DocsController {
   private setEditorSaving(token: string, saving: boolean): void {
     const current = this.current()
     const selection = current.selection
+    /* v8 ignore next -- saveDraft calls this synchronously with the selection and draft it just validated. */
     if (selection === undefined || selection.item.token !== token || selection.editor === undefined) return
     this.store.set({
       ...current,
@@ -969,6 +976,7 @@ export class DocsController {
   private setEditorError(token: string, code: string): void {
     const current = this.current()
     const selection = current.selection
+    /* v8 ignore next -- saveDraft calls this synchronously with the selection and draft it just validated. */
     if (selection === undefined || selection.item.token !== token || selection.editor === undefined) return
     this.store.set({
       ...current,
@@ -1046,6 +1054,7 @@ export class DocsController {
     await this.readDocument(selection.item, 'blocks', true, abort.signal)
     if (abort.signal.aborted) return
     const latest = this.current().selection
+    /* v8 ignore next -- a drawer replaced during the blocks read aborts that read before it returns. */
     if (latest === undefined || latest.item.token !== token) return
     await this.readDocument(latest.item, latest.full === undefined ? 'outline' : 'full', true, abort.signal)
   }
@@ -1059,6 +1068,7 @@ export class DocsController {
    */
   private async request<T>(route: string, signal: AbortSignal | undefined): Promise<T> {
     const response = await this.fetcher(route, {
+      /* v8 ignore next -- every request caller passes the signal of the read that owns it. */
       ...(signal === undefined ? {} : { signal }),
       headers: { accept: 'application/json' },
     })

@@ -42,6 +42,9 @@ export function calendarAccent(color: number | undefined): number {
  */
 function hueOf(red: number, green: number, blue: number, max: number, min: number): number {
   const delta = max - min
+  // A color whose channels are all equal sits under the neutral saturation floor, so
+  // calendarAccent answers 8 before computing a hue.
+  /* v8 ignore next 2 -- zero saturation returns the neutral accent before this call. */
   if (delta === 0) return 0
   const raw = max === red
     ? ((green - blue) / delta) % 6

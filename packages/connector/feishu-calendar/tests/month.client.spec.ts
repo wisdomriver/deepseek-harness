@@ -1,6 +1,7 @@
 // Month grid arithmetic and day layout: fixed 42 cells, week start, and per-day event placement.
 
 import { describe, expect, it } from 'vitest'
+import { localDay } from '../src/client/format.ts'
 import type { CalendarEvent } from '../src/types.ts'
 import { eventsByDay, gridCells, monthKey, monthRange, shiftMonth } from '../src/client/month.ts'
 
@@ -69,8 +70,27 @@ describe('eventsByDay', () => {
     expect(byDay.get(key)?.map(item => item.eventId)).toEqual(['allday', 'timed'])
   })
 
+  it('orders two events of one day by start and then by id', () => {
+    const sameStart = '2026-11-25T14:00:00+08:00'
+    const sameEnd = '2026-11-25T15:00:00+08:00'
+    const byDay = eventsByDay([
+      event({ eventId: 'z', start: sameStart, end: sameEnd }),
+      event({ eventId: 'b', start: sameStart, end: sameEnd }),
+      event({ eventId: 'late', start: '2026-11-25T16:00:00+08:00', end: '2026-11-25T17:00:00+08:00' }),
+    ], cells)
+    expect(byDay.get(localDay(new Date(sameStart)))?.map(item => item.eventId)).toEqual(['b', 'z', 'late'])
+  })
+
   it('ignores days outside the grid', () => {
     const byDay = eventsByDay([event({ eventId: 'far', allDay: true, start: '2027-03-01', end: '2027-03-02' })], cells)
     expect(byDay.size).toBe(0)
+  })
+})
+
+describe('invalid month keys', () => {
+  it('rejects a key that is not a calendar month', () => {
+    expect(() => shiftMonth('2026-13', 1)).toThrowError('feishu-calendar: invalid month key "2026-13"')
+    expect(() => gridCells('not-a-month', 'monday')).toThrowError(/invalid month key/)
+    expect(() => monthRange('2026-00', 'monday')).toThrowError(/invalid month key/)
   })
 })
