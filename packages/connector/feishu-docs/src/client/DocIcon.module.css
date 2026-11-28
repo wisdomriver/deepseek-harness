@@ -1,0 +1,27 @@
+.folder {
+  color: var(--dsw-alias-brand-primary);
+}
+
+.sheet {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.base {
+  color: var(--dsw-alias-brand-primary);
+}
+
+.slides {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.mindnote {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.wiki {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.document {
+  color: var(--dsw-alias-label-secondary);
+}

@@ -1,4 +1,4 @@
-.grid {
+﻿.grid {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -32,7 +32,7 @@
   min-height: 84px;
   overflow: hidden;
   padding: 4px 6px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-layer-1);
 }

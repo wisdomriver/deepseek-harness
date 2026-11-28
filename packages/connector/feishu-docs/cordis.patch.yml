@@ -1,0 +1,3 @@
+- insert:
+    - id: feishu-docs
+      name: '@deepseek-ai/dsh-feishu-docs'

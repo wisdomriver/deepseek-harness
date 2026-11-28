@@ -1,0 +1,4 @@
+/** Build the Feishu docs Host and browser entry points. */
+import { clientBundle } from '../../client/tsdown.client.ts'
+
+export default clientBundle(import.meta.dirname, ['lib/types/index.js'], { hostPhase: true })

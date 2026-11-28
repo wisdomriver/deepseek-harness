@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/connector/feishu-task/README.md
+/:
+  en: 8c1daed10b25a7d4
+  zh: ddeddbd833ca48e6
+/deepseek-ai-dsh-feishu-task:
+  en: 3eb1db1b7692fc6f
+  zh: d45aa048e309bd69
+/deepseek-ai-dsh-feishu-task/summary:
+  en: 854edcb686e338f3
+  zh: 15407bdcd84849b8
+/deepseek-ai-dsh-feishu-task/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: 0b283b30acc898ed
+/deepseek-ai-dsh-feishu-task/use-this-package:
+  en: 2edf10b4a874d177
+  zh: a4cee0f0767a5509
+/deepseek-ai-dsh-feishu-task/understand-the-implementation:
+  en: 92d2a880a4cddba3
+  zh: 5e484275f7c5fbac
+/deepseek-ai-dsh-feishu-task/further-exploration:
+  en: 5f641aaaf70690ad
+  zh: 66fe924ec5f9bd7e
+/deepseek-ai-dsh-feishu-task/model-experience:
+  en: c89d7581edb9fd7d
+  zh: d6461b16ed4b7af5
+/deepseek-ai-dsh-feishu-task/model-experience/kv-cache-effect:
+  en: eccf860b254c3da9
+  zh: 3a039fe230b4a11d
+/deepseek-ai-dsh-feishu-task/known-limitations-and-deferred-work:
+  en: 8d940a4f02d20b95
+  zh: 983eb030ae8383ed

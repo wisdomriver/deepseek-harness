@@ -1,0 +1,220 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px 20px;
+  overflow: auto;
+  box-sizing: border-box;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  font: var(--dsw-font-base-16);
+}
+
+.button {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.header .button {
+  margin-left: 0;
+}
+
+.header .primary {
+  margin-left: auto;
+}
+
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.button:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.primary {
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-brand-primary);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-brand-primary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.search {
+  display: flex;
+  gap: 6px;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.segment,
+.segmentActive {
+  flex: 1;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.segment:disabled,
+.segmentActive:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.control select {
+  padding: 3px 6px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.controlLabel {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crumb {
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.crumbText {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbs + .button {
+  margin-left: auto;
+}
+
+.mine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+.notice {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+.more {
+  align-self: center;
+  padding: 4px 12px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-strong-13);
+}
+
+.stateText {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  overflow-wrap: anywhere;
+}
+
+.state .button {
+  margin-left: 0;
+}

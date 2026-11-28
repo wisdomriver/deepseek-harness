@@ -39,14 +39,21 @@ const focusable = 'button:not(:disabled), input:not(:disabled), textarea:not(:di
 /**
  * Give only the top modal Escape and Tab ownership, then restore its previous focus.
  * Automatic entry and return focus omit outlines; keyboard traversal retains its indicators.
- * Controls mounted with the dialog use data-modal-autofocus for initial focus;
+ * Controls mounted with the dialog use the auto-focus marker for initial focus;
  * React autoFocus runs before this layer can capture the invoking control.
  * Local menus handle their Escape during capture before this bubble listener.
  * @param dialog - mounted dialog element.
  * @param open - whether this layer is active.
  * @param onClose - top-layer Escape or application close action.
+ * @param autofocusSelector - selector for the control that receives initial focus; defaults to
+ * the `data-modal-autofocus` marker that dialogs use.
  */
-export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boolean, onClose: () => void): void {
+export function useModalLayer(
+  dialog: RefObject<HTMLElement | null>,
+  open: boolean,
+  onClose: () => void,
+  autofocusSelector = '[data-modal-autofocus]',
+): void {
   const close = useRef(onClose)
   const pendingRestore = useRef<HTMLElement | undefined>(undefined)
   close.current = onClose
@@ -67,7 +74,7 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
     layers.set(document, stack)
     const layer = { element, close: () => { close.current() } }
     stack.push(layer)
-    const initial = element.querySelector<HTMLElement>('[data-modal-autofocus]')
+    const initial = element.querySelector<HTMLElement>(autofocusSelector)
       ?? element.querySelector<HTMLElement>(focusable) ?? element
     if (!element.contains(document.activeElement)) focusWithoutRing(initial)
     const keydown = (event: KeyboardEvent): void => {
@@ -107,5 +114,5 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
         }
       }
     }
-  }, [dialog, open])
+  }, [dialog, open, autofocusSelector])
 }

@@ -1792,6 +1792,48 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-feishu -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-feishu-bridge -->
+<a id="deepseek-aidsh-feishu-bridge"></a>
+
+## `@deepseek-ai/dsh-feishu-bridge`
+
+- `source`: [`packages/connector/feishu-bridge/src/index.ts:26`](../packages/connector/feishu-bridge/src/index.ts)
+
+```ts config-catalog
+/** Deployment-varying choices for the bridge. */
+export interface Config {
+  /** Absolute directory holding `lark-cli`; defaults to the installed `@larksuite/cli` package. */
+  binDir?: string
+  /** Budget for one read command, in milliseconds. */
+  readTimeoutMs?: number
+  /** Budget for one write command, in milliseconds. */
+  writeTimeoutMs?: number
+  /** CLI processes allowed to run at once across every panel. */
+  maxConcurrency?: number
+  /** Callers allowed to wait for a slot before the next one fails with `busy`. */
+  queueLimit?: number
+  /** Entries retained in the shared cache. */
+  cacheLimit?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-feishu-bridge -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-feishu-calendar -->
+<a id="deepseek-aidsh-feishu-calendar"></a>
+
+## `@deepseek-ai/dsh-feishu-calendar`
+
+- `source`: [`packages/connector/feishu-calendar/src/index.ts:21`](../packages/connector/feishu-calendar/src/index.ts)
+
+```ts config-catalog
+/** Deployment-varying choices for the Host half. */
+export interface Config {
+  /** Week start the panel grid renders from. */
+  weekStart?: 'monday' | 'sunday'
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-feishu-calendar -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-file-reference-local -->
 <a id="deepseek-aidsh-file-reference-local"></a>
 
@@ -5681,6 +5723,8 @@ export interface Config {
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | `computerUse` · `tools` · `systemPrompt` | [`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-session-inspector` | — | [`packages/experimental/session-inspector/src/index.ts`](../packages/experimental/session-inspector/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `tools` · `worktrees` | [`packages/experimental/tool-worktree/src/index.ts`](../packages/experimental/tool-worktree/src/index.ts) |
+| `@deepseek-ai/dsh-feishu-docs` | — | [`packages/connector/feishu-docs/src/index.ts`](../packages/connector/feishu-docs/src/index.ts) |
+| `@deepseek-ai/dsh-feishu-task` | — | [`packages/connector/feishu-task/src/index.ts`](../packages/connector/feishu-task/src/index.ts) |
 | `@deepseek-ai/dsh-fs-observation-policy` | — | [`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts) |
 | `@deepseek-ai/dsh-fs-ssh` | `ssh` · `sandboxPolicy` | [`packages/ssh/fs-ssh/src/index.ts`](../packages/ssh/fs-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-goal-round-driver` | `agents` · `goals` · `sessions` | [`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts) |

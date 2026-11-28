@@ -35,7 +35,7 @@
 .controls button,
 .retry {
   appearance: none;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   padding: 4px 10px;
   background: transparent;
@@ -44,9 +44,11 @@
   cursor: pointer;
 }
 
-.controls button:hover,
-.retry:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .controls button:hover,
+  .retry:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .notice {

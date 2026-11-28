@@ -64,6 +64,9 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
   ],
   // The shipped profile templates are plain data; a consumer reads their bundle names only.
   '@deepseek-ai/dsh-official-bundles': ['PROFILE_TEMPLATES'],
+  // The Feishu bridge is a stateless service seam: panels throw its coded error, and every
+  // other capability arrives through the injected service, so only the error class is shared.
+  '@deepseek-ai/dsh-feishu-bridge': ['FeishuError'],
   // Messages and assembled blocks are plain data. Each caller owns its assembler.
   '@deepseek-ai/dsh-llm': ['BlockAssembler', 'callConfigEquals', 'createUserMessage'],
   '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],

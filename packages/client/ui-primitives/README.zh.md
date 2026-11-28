@@ -33,6 +33,8 @@ kind: "package-library"
 
 弹窗自动进入及弹窗、菜单回焦，包括通过 Esc 和应用关闭快捷键触发的回焦，均使用 `focusWithoutRing(element, options?)`，在 Tab 或方向键导航恢复正常焦点样式前抑制外轮廓线。弹窗容器仍不绘制焦点外框。原有边框、阴影和错误状态保持不变。用 `data-modal-autofocus` 标记弹窗的初始控件，让模态层先保存触发控件，再移动焦点。随弹窗挂载的控件不得使用 React `autoFocus`，因为它会在保存触发控件前执行。弹窗容器获得焦点时，Tab 和 Shift+Tab 分别进入第一个和最后一个可聚焦控件。
 
+`StatusCard`、`SidePanel` 与 `ListRow` 组成面板套件：抽屉通过同一模态层加入 `Modal` 的顶层焦点生命周期，并用 `data-panel-autofocus` 标记初始控件；卡片的全部文案都由 props 传入；行自己负责键盘激活，调用方把行内操作放在行外。
+
 本包是 Web 壳的构建输入。静态 ESM 为 Vite 保留第三方导入，包括 KaTeX 等第三方样式表；本包自身的样式表编译进 `__$dsh_client_module_manifest` 导出，由 renderer 安装；独立消费方自行提供开发依赖（[依赖规则](../AGENTS.md#dependency-declaration)）。
 
 只要 Web 客户端需要标准控件或 agent 输出渲染器，就用这些原子组件拼装功能 UI。它们只经 React 渲染，并从主题取得 `--dsw-*` 设计 token，因此无需导入主题或 slot 系统即可适配任意插件。
@@ -65,6 +67,9 @@ kind: "package-library"
 | `useRowDragPreview` | 使用不可交互的离屏行副本生成原生拖拽预览。可选的 `inheritedProperties` 列表指定离屏包装层需要复制其计算值的 CSS 自定义属性；省略时不复制。列表引用需保持稳定，因为替换列表会清除活动预览。未列出的自定义属性按预览所在位置的正常继承规则生效。传入设置表面底色的类名；拖拽来自子级手柄时，将行元素传给 `start`；`clear` 和卸载会移除副本。 |
 | `TextShimmer` | 同一道高光从左到右扫过一行的标题、分隔符、摘要与后缀：首次等待 300ms，扫动一秒，再静止 500ms。遮罩覆盖内容宽度，并限制在可见行宽内，相对垂直方向倾斜 15°，峰值区域平坦，两侧柔和渐隐。移动的装饰层始终裁剪在行内，不会扩大可滚动区域。底色继承调用方的颜色，包括悬停变化；主题提供半透明高光。图标和箭头放在 `TextShimmer` 外，只有文字和分隔符参与扫光。字符串子节点沿用稳定的文字接口；嵌套的 `TextShimmer` 共用外层动画。活动期间组合子节点渲染两次，因此不得带副作用或元素 id。分隔符标记 `data-shimmer-decoration`，让填色参与扫光。`DisclosureRow` 将 `contentClassName` 传给文字区域，将 `contentLayoutClassName` 传给内部布局。惰性装饰副本不参与交互、选区和无障碍访问；文字更新保留动画，减少动态效果模式保留静态底色。 |
 | `Modal` | 页面遮罩之上的居中对话框。嵌套对话框可通过 `onKeyDownCapture` 在文档级 Escape 处理器之前拦截按键。 色层与弹窗淡入，背景模糊始终完整生效，并遵循减少动态效果偏好。调用方已模糊源页面时设置 `backdropBlur={false}`。`tone="warning"` 在标题中显示橙色警告图标，并移除正文额外的顶部间距；其他弹窗的间距保持不变。 |
+| `SidePanel` | 页面遮罩之上的右侧抽屉，用于展示选中项的详情。`open={false}` 时不渲染任何内容。它从共用模态层获得 Escape、Tab 循环与焦点归还，打开时聚焦 `[data-panel-autofocus]` 或首个可聚焦控件，点击遮罩关闭；入场动画遵循减少动态效果偏好。`title` 为对话框命名，`width` 取 `md`（420px）或 `lg`（560px）。传入 `closeLabel` 时在标题行渲染关闭按钮；不传时只有 Escape 与遮罩两种关闭方式。 |
+| `StatusCard` | 在面板加载中或无法显示内容时替代正文的居中卡片：可选的装饰图标、标题、说明，以及最多两个操作（`primaryAction` 渲染 primary 按钮，`secondaryAction` 渲染 ghost 按钮）。`tone="danger"` 用错误状态色绘制图标并设置 `data-tone`。全部文案由 props 传入，卡片本身不读 locale，也不自带表面。 |
+| `ListRow` | 面板列表中的一行：可选的 `leading` 图标、`title`、可选的 `meta` 副行，以及 `trailing` 尾部呈现。点击、Enter 与 Space 均可激活；`selected` 通过 `aria-current="true"` 表示，`disabled` 通过 `aria-disabled` 让行保持可聚焦、可读但不激活。行是列表唯一的交互目标，行内操作应放在行外。 |
 | `RiskConfirmation` | 以显式复选框把关的敏感操作确认，采用共用的警告标题布局。 |
 | `Tooltip` | 锚定在克隆子元素上的悬停与键盘聚焦提示；可选的 `delayMs` 控制悬停延迟，`focusDelayMs` 控制键盘聚焦延迟，均默认为 0 毫秒。可通过 `portal` 渲染到外层，避免被容器裁剪，或受祖先层叠上下文限制其 z-index。 |
 | `HoverCard`、`HoverCardGroup` | 可阅读、可选带复制按钮的悬停预览；物理列表可选择让卡片共享首次显示等待，并互斥显示。紧凑卡片出现在锚点结束一侧；会超出视口结束边缘、而开始一侧放得下时出现在开始一侧，例如窗口末端面板中的行；两侧都放不下时出现在锚点下方，与锚点的开始边缘对齐，下方放不下则出现在上方，因此不会盖住锚点；高到上下都放不下的卡片留在视口内，位于底部结束一角。它由 CSS 锚点定位放置，卡片跟随锚点时不需要脚本测量；Firefox 解析锚点位置时不计入祖先元素的 transform，锚点位于带 transform 的祖先之内时，紧凑卡片在 Firefox 中的位置会偏移。 |

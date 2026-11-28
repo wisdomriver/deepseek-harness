@@ -1,47 +1,8 @@
-// Calendar service behavior over a recorded command runner: envelope parsing, normalization,
-// error mapping, caching, single-flight, and the create payload.
+// Calendar service behavior over a recorded command runner: normalization, error mapping,
+// caching, single-flight, and the three write payloads.
 
 import { describe, expect, it } from 'vitest'
-import { jsonObjectIn, type CommandOutcome, type CommandRequest, type CommandRunner } from '../src/cli.ts'
-import { CalendarService } from '../src/service.ts'
-
-/** Successful envelope for one command. */
-function succeed(data: unknown, extra: Record<string, unknown> = {}): CommandOutcome {
-  return { exitCode: 0, stdout: JSON.stringify({ ok: true, identity: 'user', data, ...extra }), stderr: '' }
-}
-
-/** Failure envelope `lark-cli` writes to standard error. */
-function fail(error: Record<string, unknown>, exitCode = 1): CommandOutcome {
-  return { exitCode, stdout: '', stderr: JSON.stringify({ ok: false, identity: 'user', error }) }
-}
-
-/** Build a service over a runner that records every request. */
-function serviceOver(answers: (request: CommandRequest) => CommandOutcome) {
-  const calls: CommandRequest[] = []
-  const run: CommandRunner = async (request) => {
-    calls.push(request)
-    return answers(request)
-  }
-  const service = new CalendarService({
-    run,
-    readTimeoutMs: 15_000,
-    writeTimeoutMs: 30_000,
-    maxConcurrency: 2,
-    queueLimit: 8,
-    weekStart: 'monday',
-  })
-  return { calls, service }
-}
-
-describe('jsonObjectIn', () => {
-  it('skips progress lines the CLI prints before the envelope', () => {
-    expect(jsonObjectIn('[calendar +delete] deleting master event\n{"ok":true,"data":{"a":1}}')).toEqual({ ok: true, data: { a: 1 } })
-  })
-
-  it('returns undefined when a stream holds no object', () => {
-    expect(jsonObjectIn('lark-cli: command not found')).toBeUndefined()
-  })
-})
+import { authStatus, fail, serviceOver, succeed } from './harness.ts'
 
 describe('CalendarService.events', () => {
   it('normalizes all-day and timed instances, all-day first', async () => {
@@ -96,14 +57,7 @@ describe('CalendarService.events', () => {
 
 describe('CalendarService.status', () => {
   it('reports the scope the token lacks and the configured week start', async () => {
-    const { service } = serviceOver(() => ({
-      exitCode: 0,
-      stderr: '',
-      stdout: JSON.stringify({
-        appId: 'cli_x',
-        identities: { user: { status: 'ready', available: true, userName: 'Ada', scope: 'calendar:calendar.event:read' } },
-      }),
-    }))
+    const { service } = serviceOver(() => authStatus('calendar:calendar.event:read'))
     await expect(service.status()).resolves.toEqual({
       cli: true,
       configured: true,

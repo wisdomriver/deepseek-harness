@@ -1,27 +1,13 @@
 // Route envelopes: status and detail answers stay flat, and a bad body answers 400.
 
 import { describe, expect, it } from 'vitest'
-import type { CommandOutcome, CommandRequest } from '../src/cli.ts'
-import { CalendarService } from '../src/service.ts'
-import { calendarRoutes } from '../src/routes.ts'
+import type { CommandOutcome, CommandRequest } from '@deepseek-ai/dsh-feishu-bridge'
 import { EVENT_PATH, STATUS_PATH } from '../src/paths.ts'
+import { serviceOver, succeed } from './harness.ts'
 
 /** Build a route set over one canned command runner. */
 function routesOver(answer: (request: CommandRequest) => CommandOutcome, log?: (message: string) => void) {
-  const service = new CalendarService({
-    run: async request => answer(request),
-    readTimeoutMs: 15_000,
-    writeTimeoutMs: 30_000,
-    maxConcurrency: 2,
-    queueLimit: 8,
-    weekStart: 'monday',
-  })
-  return calendarRoutes({ service, ...(log === undefined ? {} : { log }) })
-}
-
-/** One successful envelope. */
-function succeed(data: unknown): CommandOutcome {
-  return { exitCode: 0, stdout: JSON.stringify({ ok: true, data }), stderr: '' }
+  return serviceOver(answer, log === undefined ? {} : { log }).routes
 }
 
 describe('calendar routes', () => {

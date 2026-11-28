@@ -19,7 +19,7 @@
       "path": "../../client/connection/tsconfig.host.json"
     },
     {
-      "path": "../../util/error"
+      "path": "../feishu-bridge"
     }
   ]
 }

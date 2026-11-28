@@ -16,7 +16,6 @@
   padding: 16px 18px;
   overflow: auto;
   background: var(--dsw-alias-bg-layer-1);
-  border-left: 1px solid var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-panel);
 }
 
@@ -52,7 +51,7 @@
 .retry {
   margin-left: 8px;
   padding: 2px 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: inherit;
@@ -113,7 +112,7 @@
 
 .action {
   padding: 6px 12px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-button-tool-bar-fill);
   color: var(--dsw-alias-label-primary);
@@ -122,8 +121,10 @@
   cursor: pointer;
 }
 
-.action:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .action:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .spacer {

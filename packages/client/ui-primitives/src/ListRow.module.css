@@ -1,0 +1,77 @@
+.row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  text-align: start;
+}
+
+/* Rows sit in scrolling lists, so the ring is drawn inside the row's box. */
+.row:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .row:hover:not(.selected):not(.disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.selected {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+.leading {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title,
+.meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.title {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.meta {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.trailing {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}

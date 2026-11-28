@@ -162,6 +162,10 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-cli-account` | yes | Host Service of CLI app plugins: each plugin registers its third-party CLI and account, and the Service gives the model the CLI's absolute path, runs one account operation at a time, and shows the account on the Plugins page |
 | `@deepseek-ai/dsh-dingtalk` | yes | DingTalk plugin: the official dws CLI with its skills, and sign-in from the Plugins page |
 | `@deepseek-ai/dsh-feishu` | yes | Feishu plugin: the official lark-cli with its embedded skills, and account connection from the Plugins page |
+| `@deepseek-ai/dsh-feishu-bridge` | yes | Feishu bridge: runs the managed lark-cli for Feishu panel plugins with one process gate, an in-memory cache, and stable failure codes |
+| `@deepseek-ai/dsh-feishu-calendar` | yes | Feishu calendar panel: the primary calendar's month, today's agenda, event details, and quick event creation through lark-cli |
+| `@deepseek-ai/dsh-feishu-docs` | no | Feishu cloud-doc panel: recent documents, search, drive browsing, a read-only preview, and block-level edits through lark-cli |
+| `@deepseek-ai/dsh-feishu-task` | no | Feishu tasks panel: pending, assigned, and completed tasks grouped by due date, with inline completion and quick task creation through lark-cli |
 | `@deepseek-ai/dsh-linear` | yes | Linear plugin: Linear's hosted MCP server, authorized through the shared MCP manager |
 | `@deepseek-ai/dsh-notion` | yes | Notion plugin: Notion's hosted MCP server, authorized through the shared MCP manager |
 | `@deepseek-ai/dsh-tencent-docs` | yes | Tencent Docs plugin: Tencent Docs' hosted MCP server, authorized through the shared MCP manager |

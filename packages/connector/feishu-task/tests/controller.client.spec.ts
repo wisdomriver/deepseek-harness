@@ -1,0 +1,257 @@
+// Panel controller behavior over recorded route answers: the five states, the debounced
+// search, optimistic completion, the detail read, and creation.
+
+import { describe, expect, it, vi } from 'vitest'
+import { TaskController } from '../src/client/controller.ts'
+import { STATUS_ROUTE, TASKS_ROUTE, TASK_ROUTE } from '../src/paths.ts'
+import type { TaskDetail, TaskSummary } from '../src/types.ts'
+
+const STATUS = { cli: true, configured: true, connected: true, userName: 'Ada', missingScopes: [] }
+
+/** One normalized row due tomorrow. */
+function row(overrides: Partial<TaskSummary> = {}): TaskSummary {
+  return {
+    taskId: 't1',
+    summary: 'Ship it',
+    status: 'todo',
+    assignees: ['ou_a'],
+    followers: [],
+    dueAt: new Date(Date.now() + 86_400_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
+const DETAIL: TaskDetail = { ...row(), tasklists: [], dueAllDay: false }
+
+/** One answer a test resolves at its own time. */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((settle) => { resolve = settle })
+  return { promise, resolve }
+}
+
+/** Route answers one test supplies; a failure envelope answers with a 500 status. */
+interface Answers {
+  readonly status?: () => unknown
+  readonly tasks?: (query: URLSearchParams) => unknown
+  readonly task?: () => unknown
+  readonly mutate?: () => unknown
+  readonly create?: () => unknown
+}
+
+/**
+ * Build a fetcher answering each route, recording every call.
+ * @param answers - the answer each route returns, or a promise of it.
+ * @returns the fetcher and the recorded calls.
+ */
+function server(answers: Answers) {
+  const calls: { readonly route: string; readonly init: RequestInit | undefined }[] = []
+  const fetcher: typeof fetch = async (input, init) => {
+    const route = String(input)
+    calls.push({ route, init })
+    const url = new URL(route, 'http://localhost')
+    const path = url.pathname.slice(1)
+    const value: unknown = init?.method === 'POST'
+      ? path === TASK_ROUTE ? answers.mutate?.() : answers.create?.()
+      : path === STATUS_ROUTE
+        ? answers.status?.()
+        : path === TASK_ROUTE ? answers.task?.() : answers.tasks?.(url.searchParams)
+    return respond(await value)
+  }
+  return { calls, fetcher }
+}
+
+/**
+ * Build one route answer.
+ * @param value - the successful payload, or a failure envelope.
+ * @returns the response.
+ */
+function respond(value: unknown): Response {
+  const failed = typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false
+  return new Response(JSON.stringify(failed ? value : { ok: true, data: value }), { status: failed ? 500 : 200 })
+}
+
+describe('TaskController states', () => {
+  it('reads status and the pending list, then reports ready', async () => {
+    const { calls, fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row()], view: 'pending', fetchedAt: 'now' }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    const snapshot = controller.store.getSnapshot()
+    expect(snapshot.tasks).toHaveLength(1)
+    expect(snapshot.groups[0]?.key).toBe('tomorrow')
+    expect(snapshot.userName).toBe('Ada')
+    expect(calls[0]?.route).toBe(STATUS_ROUTE)
+    expect(calls[1]?.route).toBe(`${TASKS_ROUTE}?view=pending`)
+  })
+
+  it('reports a missing CLI as no-cli', async () => {
+    const { fetcher } = server({
+      status: () => ({ ok: false, error: { code: 'cli-missing', message: 'missing', requestId: 'r' } }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('no-cli') })
+    expect(controller.store.getSnapshot().errorCode).toBe('cli-missing')
+  })
+
+  it('reports a signed-out account as disconnected', async () => {
+    const { calls, fetcher } = server({ status: () => ({ ...STATUS, connected: false }) })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('disconnected') })
+    expect(calls.every(call => !call.route.startsWith(TASKS_ROUTE))).toBe(true)
+  })
+
+  it('reports missing scopes as permission without reading the list', async () => {
+    const { calls, fetcher } = server({ status: () => ({ ...STATUS, missingScopes: ['task:task:read'] }) })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('permission') })
+    expect(controller.store.getSnapshot().missingScopes).toEqual(['task:task:read'])
+    expect(calls.every(call => !call.route.startsWith(TASKS_ROUTE))).toBe(true)
+  })
+
+  it('reports a failed list read as error', async () => {
+    const { fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ ok: false, error: { code: 'upstream', message: 'bad', requestId: 'r' } }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('error') })
+    expect(controller.store.getSnapshot().errorCode).toBe('upstream')
+  })
+})
+
+describe('TaskController search', () => {
+  it('waits for the debounce before reading typed input', async () => {
+    const { calls, fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [], view: 'pending', fetchedAt: 'now' }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.actions.search('dsh')
+    expect(controller.store.getSnapshot().query).toBe('dsh')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(calls).toHaveLength(0)
+    await vi.waitFor(() => {
+      expect(calls.some(call => call.route === `${TASKS_ROUTE}?view=pending&query=dsh`)).toBe(true)
+    })
+    controller.dispose()
+  })
+})
+
+describe('TaskController completion', () => {
+  it('marks a row done while the write runs and never writes twice', async () => {
+    const gate = deferred<unknown>()
+    const { calls, fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row()], view: 'pending', fetchedAt: 'now' }),
+      mutate: () => gate.promise,
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.complete('t1')
+    expect(controller.store.getSnapshot().marks['t1']).toMatchObject({ status: 'done', pending: true })
+    controller.actions.complete('t1')
+    gate.resolve({ taskId: 't1', status: 'done', completedAt: '2026-11-10T00:00:00.000Z' })
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().marks['t1']).toBeUndefined() })
+    const posts = calls.filter(call => call.init?.method === 'POST')
+    expect(posts).toHaveLength(1)
+    expect(JSON.parse(String(posts[0]?.init?.body))).toEqual({ action: 'complete', taskId: 't1' })
+  })
+
+  it('rolls a failed completion back and reports its code', async () => {
+    const { fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row()], view: 'pending', fetchedAt: 'now' }),
+      mutate: () => ({ ok: false, error: { code: 'timeout', message: 'slow', requestId: 'r' } }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.complete('t1')
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().actionErrorCode).toBe('timeout') })
+    expect(controller.store.getSnapshot().marks['t1']).toBeUndefined()
+    expect(controller.store.getSnapshot().tasks[0]?.status).toBe('todo')
+  })
+
+  it('marks a reopened row to do while the write runs', async () => {
+    const gate = deferred<unknown>()
+    const { fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row({ status: 'done' })], view: 'done', fetchedAt: 'now' }),
+      mutate: () => gate.promise,
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.reopen('t1')
+    expect(controller.store.getSnapshot().marks['t1']).toMatchObject({ status: 'todo', pending: true })
+    gate.resolve({ taskId: 't1', status: 'todo' })
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().marks['t1']).toBeUndefined() })
+  })
+})
+
+describe('TaskController detail', () => {
+  it('fills the drawer with the task detail and closes it', async () => {
+    const { calls, fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row()], view: 'pending', fetchedAt: 'now' }),
+      task: () => DETAIL,
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.openTask('t1')
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().selection?.phase).toBe('ready') })
+    expect(controller.store.getSnapshot().selection?.detail?.summary).toBe('Ship it')
+    expect(calls.at(-1)?.route).toBe(`${TASK_ROUTE}?taskId=t1`)
+    controller.actions.closeTask()
+    expect(controller.store.getSnapshot().selection).toBeUndefined()
+  })
+})
+
+describe('TaskController create', () => {
+  it('posts the form, highlights the new task, and re-reads the list', async () => {
+    const { calls, fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [row()], view: 'pending', fetchedAt: 'now' }),
+      create: () => ({ taskId: 'new_1' }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.openCreate()
+    expect(controller.store.getSnapshot().composer?.open).toBe(true)
+    controller.actions.submitCreate({ summary: 'Buy milk' })
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().composer).toBeUndefined() })
+    expect(controller.store.getSnapshot().highlightTaskId).toBe('new_1')
+    const posted = calls.find(call => call.init?.method === 'POST')
+    expect(posted?.route).toBe(TASKS_ROUTE)
+    expect(JSON.parse(String(posted?.init?.body))).toEqual({ summary: 'Buy milk' })
+    expect(calls.filter(call => call.route.startsWith(`${TASKS_ROUTE}?`))).toHaveLength(2)
+  })
+
+  it('keeps the dialog open and reports the failure code', async () => {
+    const { fetcher } = server({
+      status: () => STATUS,
+      tasks: () => ({ tasks: [], view: 'pending', fetchedAt: 'now' }),
+      create: () => ({ ok: false, error: { code: 'unknown-outcome', message: 'maybe', requestId: 'r' } }),
+    })
+    const controller = new TaskController(fetcher)
+    controller.load()
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().phase).toBe('ready') })
+    controller.actions.openCreate()
+    controller.actions.submitCreate({ summary: 'Buy milk' })
+    await vi.waitFor(() => { expect(controller.store.getSnapshot().composer?.errorCode).toBe('unknown-outcome') })
+    expect(controller.store.getSnapshot().composer?.open).toBe(true)
+    expect(controller.store.getSnapshot().composer?.pending).toBe(false)
+  })
+})

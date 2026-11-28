@@ -252,6 +252,10 @@ flowchart TD
     pkg_cli_account["cli-account"]
     pkg_dingtalk["dingtalk"]
     pkg_feishu["feishu"]
+    pkg_feishu_bridge["feishu-bridge"]
+    pkg_feishu_calendar["feishu-calendar"]
+    pkg_feishu_docs["feishu-docs"]
+    pkg_feishu_task["feishu-task"]
     pkg_linear["linear"]
     pkg_notion["notion"]
     pkg_tencent_docs["tencent-docs"]
@@ -1758,6 +1762,10 @@ flowchart TD
 | [`client-ui-workspace`](../packages/client/ui-workspace) | `client` | — |
 | [`client-web`](../packages/client/web) | `client` | — |
 | [`computer-use`](../packages/computer-use/computer-use) | `computer-use` | — |
+| [`feishu-bridge`](../packages/connector/feishu-bridge) | `connector` | — |
+| [`feishu-calendar`](../packages/connector/feishu-calendar) | `connector` | — |
+| [`feishu-docs`](../packages/connector/feishu-docs) | `connector` | — |
+| [`feishu-task`](../packages/connector/feishu-task) | `connector` | — |
 | [`linear`](../packages/connector/linear) | `connector` | — |
 | [`notion`](../packages/connector/notion) | `connector` | — |
 | [`tencent-docs`](../packages/connector/tencent-docs) | `connector` | — |

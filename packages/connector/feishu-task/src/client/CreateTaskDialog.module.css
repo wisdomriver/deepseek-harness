@@ -1,0 +1,112 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-mask-2);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, 92vw);
+  padding: 18px 20px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
+.title {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-base-16);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.label {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.input,
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+}
+
+.error {
+  margin: 0;
+  color: var(--dsw-alias-state-error-primary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.button,
+.primary {
+  padding: 6px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.primary {
+  border-color: var(--dsw-alias-button-primary-fill);
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+}
+
+.button:disabled,
+.primary:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    background: var(--dsw-alias-button-primary-hover);
+    border-color: var(--dsw-alias-button-primary-hover);
+  }
+}

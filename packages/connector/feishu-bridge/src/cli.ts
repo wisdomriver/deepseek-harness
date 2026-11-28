@@ -1,13 +1,13 @@
 /**
- * Resolve the managed `lark-cli` executable, run one command, and extract its JSON envelope.
- * @module @deepseek-ai/dsh-feishu-calendar/cli
+ * Resolve the managed `lark-cli` executable and run one command to completion.
+ * @module @deepseek-ai/dsh-feishu-bridge/cli
  */
 
 import { spawn } from 'node:child_process'
 import { accessSync, constants } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CalendarError } from './errors.ts'
+import { FeishuError } from './errors.ts'
 
 /** The program name every guide and diagnostic uses. */
 export const PROGRAM = 'lark-cli'
@@ -28,7 +28,7 @@ export function executableFileName(platform: NodeJS.Platform): string {
  * Locate the managed executable.
  * @param binDir - absolute override; defaults to the installed `@larksuite/cli` package bin directory.
  * @returns the absolute path of the executable.
- * @throws CalendarError with code `cli-missing` when the file is absent or not executable.
+ * @throws FeishuError with code `cli-missing` when the file is absent or not executable.
  */
 export function resolveCliExecutable(binDir: string | undefined): string {
   const program = join(
@@ -38,9 +38,9 @@ export function resolveCliExecutable(binDir: string | undefined): string {
   try {
     accessSync(program, constants.X_OK)
   } catch (error) {
-    throw new CalendarError(
+    throw new FeishuError(
       'cli-missing',
-      `feishu-calendar: ${program} is not executable; approve the @larksuite/cli install script or set binDir`,
+      `feishu-bridge: ${program} is not executable; approve the @larksuite/cli install script or set binDir`,
       { cause: error },
     )
   }
@@ -75,7 +75,7 @@ export type CommandRunner = (request: CommandRequest) => Promise<CommandOutcome>
 /**
  * Build a runner over one executable path.
  * @param resolveExecutable - resolves the executable lazily, so a missing CLI surfaces as `cli-missing` at call time rather than at load.
- * @returns the runner used by the calendar service.
+ * @returns the runner used by the bridge service.
  */
 export function createProcessRunner(resolveExecutable: () => string): CommandRunner {
   return request => new Promise<CommandOutcome>((resolve, reject) => {
@@ -95,18 +95,18 @@ export function createProcessRunner(resolveExecutable: () => string): CommandRun
     }
     const onAbort = (): void => {
       child.kill()
-      fail(new CalendarError('timeout', `${PROGRAM} ${request.args.join(' ')} was cancelled`))
+      fail(new FeishuError('timeout', `${PROGRAM} ${request.args.join(' ')} was cancelled`))
     }
     const timer = setTimeout(() => {
       child.kill()
-      fail(new CalendarError('timeout', `${PROGRAM} ${request.args.join(' ')} exceeded ${request.timeoutMs} ms`))
+      fail(new FeishuError('timeout', `${PROGRAM} ${request.args.join(' ')} exceeded ${request.timeoutMs} ms`))
     }, request.timeoutMs)
     request.signal?.addEventListener('abort', onAbort, { once: true })
     const collect = (chunks: Buffer[], chunk: Buffer): void => {
       retained += chunk.length
       if (retained > OUTPUT_LIMIT_BYTES) {
         child.kill()
-        fail(new CalendarError('upstream', `${PROGRAM} ${request.args.join(' ')} produced more than ${OUTPUT_LIMIT_BYTES} bytes`))
+        fail(new FeishuError('upstream', `${PROGRAM} ${request.args.join(' ')} produced more than ${OUTPUT_LIMIT_BYTES} bytes`))
         return
       }
       chunks.push(chunk)
@@ -115,8 +115,8 @@ export function createProcessRunner(resolveExecutable: () => string): CommandRun
     child.stderr.on('data', (chunk: Buffer) => { collect(stderr, chunk) })
     child.on('error', (error: NodeJS.ErrnoException) => {
       fail(error.code === 'ENOENT'
-        ? new CalendarError('cli-missing', `feishu-calendar: ${executable} could not be started`, { cause: error })
-        : new CalendarError('upstream', `${PROGRAM} could not be started`, { cause: error }))
+        ? new FeishuError('cli-missing', `feishu-bridge: ${executable} could not be started`, { cause: error })
+        : new FeishuError('upstream', `${PROGRAM} could not be started`, { cause: error }))
     })
     child.on('close', (exitCode: number | null) => {
       if (settled) return

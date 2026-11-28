@@ -18,7 +18,6 @@ kind: "package-reference"
 - [延伸阅读](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发者说明](#dev-note)
 
 -----
 
@@ -29,7 +28,7 @@ kind: "package-reference"
 
 当前月由一次 `calendar +agenda` 覆盖网格的 42 个格子，所以一个视图只起一次 CLI 进程；60 秒内的重复读取走内存缓存。详情按事件 id 走 `calendar +get`，重复日程的某个实例会额外读一次 master 以取得重复规则。新建通过 `calendar events create --data -` 经标准输入提交，标题不出现在进程命令行里，也不会创建会议或提醒。
 
-配置在 Host 入口上：`binDir` 指定非默认的 `lark-cli`，`readTimeoutMs` 与 `writeTimeoutMs` 是命令预算，`maxConcurrency` 与 `queueLimit` 控制 CLI 并发闸门，`weekStart` 决定网格第一列。
+本包需要同一个 profile 里的飞书桥接插件（`@deepseek-ai/dsh-feishu-bridge`）：`lark-cli` 位置、命令预算、共享进程闸门与内存缓存都归它管。只装面板而不装桥接，面板不会激活。本包自己的配置只有 `weekStart`，决定网格第一列。
 
 -----
 
@@ -39,15 +38,15 @@ kind: "package-reference"
 <details>
 <summary>实现内部细节 —— 点击展开</summary>
 
-Host 面在 Connection 的认证栅栏内注册三条精确 Fetch 路由，只有 owner principal 能到达：`/api/feishu-calendar/status`、`/api/feishu-calendar/events`（GET 读一个月，POST 新建）和 `/api/feishu-calendar/event`（GET 读详情）。服务对象持有 CLI 运行器、带单飞的内存缓存和并发闸门；`lark-cli` 延迟解析，所以可执行文件缺失只会让首个请求以 `cli-missing` 失败，而不是让插件加载失败。
+Host 面在 Connection 的认证栅栏内注册三条精确 Fetch 路由，只有 owner principal 能到达：`/api/feishu-calendar/status`、`/api/feishu-calendar/events`（GET 读一个月，POST 新建）和 `/api/feishu-calendar/event`（GET 读详情）。每个处理函数只返回数据或抛 `FeishuError`；信封、HTTP 状态与 requestId 由桥接插件的 `panelRoutes` 补上。这里的服务只保留日历命令拼装与归一：它调用 `feishuBridge.run`，把读结果按 `calendar:` 前缀存进共享缓存，并在写操作后统一失效。
 
 浏览器面在 `feishu-calendar` key 下注册 `main` 面板与对应的 `sidebar.panellist` 入口，并驱动一个快照 store：先状态、再当月日程。组件通过渲染器绑定的 `useCalendar` 读取快照，不接触 `ctx`。
 
 | 文件 | 职责 |
 |---|---|
-| [`src/cli.ts`](src/cli.ts) | 可执行文件定位、子进程执行、JSON 信封提取 |
-| [`src/service.ts`](src/service.ts) | 日历读取与新建、缓存、单飞、并发闸门、错误映射 |
-| [`src/routes.ts`](src/routes.ts) | 路由定义、请求校验、响应信封 |
+| [`src/service.ts`](src/service.ts) | 日历命令拼装、字段归一、缓存键与失效 |
+| [`src/routes.ts`](src/routes.ts) | 路由定义与请求校验，复用桥接的路由包装 |
+| [`src/paths.ts`](src/paths.ts) | 路由路径常量 |
 | [`src/client/controller.ts`](src/client/controller.ts) | 面板状态与当月读取 |
 | [`src/client/CalendarPanel.tsx`](src/client/CalendarPanel.tsx) | 面板渲染 |
 | [`src/client/locales.ts`](src/client/locales.ts) | `feishuCalendar` 文案，中文为 key 来源 |
@@ -68,9 +67,11 @@ Host 面在 Connection 的认证栅栏内注册三条精确 Fetch 路由，只�
 <a id="model-experience"></a>
 ## 模型体验
 
-本插件不产生任何模型可见输入：不注册工具、不加提示词段落、不改请求上下文，读取的日程数据也不会进入模型请求。
+无：日历面板只渲染认证路由，不注册工具、提示段或请求上下文。
 
------
+#### KV 缓存影响
+
+无。不改变任何缓存前缀。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
@@ -79,10 +80,3 @@ Host 面在 Connection 的认证栅栏内注册三条精确 Fetch 路由，只�
 - 只读取主日历；新建只支持标题、起止时间与详情。
 - 新建表单只用已加载的当月数据做重叠提示，最终以飞书为准。
 - 客户端在面板注册时读取路由，而不是在面板首次可见时读取；可见时的状态轮询尚未实现。
-
------
-
-<a id="dev-note"></a>
-## 开发者说明
-
-本包使用 Host 与 Client 两个编译面：根 `tsconfig.json` 只做 solution，`tsconfig.host.json` 与 `tsconfig.client.json` 分别是两个叶子。构建用 `tsdown`（`clientBundle` 预设，`hostPhase: true`），产物为 `lib/index.js` 与 `lib/client.js`。

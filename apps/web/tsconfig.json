@@ -29,6 +29,7 @@
     "tests/remote-connection.e2e.ts",
     "tests/remote-connection-fixture.ts",
     "tests/feishu-calendar.e2e.ts",
+    "tests/feishu-panels.e2e.ts",
     "tests/home-whale.e2e.ts",
     "tests/sidebar-drawer.e2e.ts",
     "tests/session-panel-layout.e2e.ts",

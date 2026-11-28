@@ -54,9 +54,8 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-error": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "@larksuite/cli": "1.0.97"
+    "@deepseek-ai/dsh-feishu-bridge": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"
